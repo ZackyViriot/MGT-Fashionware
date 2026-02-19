@@ -62,5 +62,6 @@ export function normalizeCustomDesign(d: CustomDesign | undefined): {
 /** Check if a side design has any content */
 export function sideHasContent(side: SideDesign | undefined): boolean {
   if (!side) return false;
-  return !!(side.text?.trim() || side.imageData);
+  const hasTextItems = side.textItems && side.textItems.length > 0;
+  return !!(side.text?.trim() || side.imageData || hasTextItems);
 }

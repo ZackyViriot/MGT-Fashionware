@@ -59,6 +59,7 @@ export default function CartPage() {
                         imageData={frontSide?.imageData}
                         imagePos={frontSide?.imagePos}
                         textPos={frontSide?.textPos}
+                        textItems={frontSide?.textItems}
                         side="front"
                         className="w-20 h-20 md:w-24 md:h-24"
                       />

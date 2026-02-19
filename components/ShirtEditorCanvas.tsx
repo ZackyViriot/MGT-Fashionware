@@ -4,22 +4,21 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Stage, Layer, Image as KImage, Text as KText, Group, Transformer } from "react-konva";
 import type Konva from "konva";
-import type { ElementPosition } from "@/utils/cart-context";
+import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import { SHIRT_CONFIG, LOGICAL_WIDTH, LOGICAL_HEIGHT, type ShirtSide } from "@/constants/shirt-config";
 import { useShirtImage } from "@/hooks/use-shirt-image";
 import { useContainerSize } from "@/hooks/use-container-size";
 
 interface Props {
   shirtColor: string;
-  text?: string;
-  textColor?: string;
-  fontFamily?: string;
-  fontSize?: number;
   imageData?: string;
   imagePos: ElementPosition;
-  textPos: ElementPosition;
   onImagePosChange: (pos: ElementPosition) => void;
-  onTextPosChange: (pos: ElementPosition) => void;
+  textItems: TextItem[];
+  onTextItemPosChange: (id: string, pos: ElementPosition) => void;
+  selectedTextId: string | null;
+  onSelect: (type: "image" | "text", id?: string) => void;
+  onDeselect: () => void;
   side?: ShirtSide;
 }
 
@@ -31,15 +30,14 @@ function clamp(v: number, min: number, max: number) {
 
 export default function ShirtEditorCanvas({
   shirtColor,
-  text,
-  textColor = "#ffffff",
-  fontFamily = "sans-serif",
-  fontSize = 24,
   imageData,
   imagePos,
-  textPos,
   onImagePosChange,
-  onTextPosChange,
+  textItems,
+  onTextItemPosChange,
+  selectedTextId,
+  onSelect,
+  onDeselect,
   side = "front",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,22 +47,26 @@ export default function ShirtEditorCanvas({
 
   const { image: shirtImage } = useShirtImage(side, shirtColor);
   const [designImage, setDesignImage] = useState<HTMLImageElement | null>(null);
-  const [selected, setSelected] = useState<"image" | "text" | null>(null);
+  const [selected, setSelected] = useState<{ type: "image" | "text"; id?: string } | null>(null);
 
   const imageRef = useRef<Konva.Image>(null);
-  const textRef = useRef<Konva.Text>(null);
+  const textRefs = useRef<Record<string, Konva.Text | null>>({});
   const trRef = useRef<Konva.Transformer>(null);
 
-  // Keep latest callbacks in refs
-  const callbacksRef = useRef({ onImagePosChange, onTextPosChange });
-  callbacksRef.current = { onImagePosChange, onTextPosChange };
+  const callbacksRef = useRef({ onImagePosChange, onTextItemPosChange });
+  callbacksRef.current = { onImagePosChange, onTextItemPosChange };
 
   const printArea = SHIRT_CONFIG[side].printArea;
-  const displayText = text || "";
 
   const imgW = IMAGE_BASE * imagePos.scale;
   const imgH = IMAGE_BASE * imagePos.scale;
-  const scaledFontSize = fontSize * textPos.scale;
+
+  // Sync internal selection with parent
+  useEffect(() => {
+    if (selectedTextId) {
+      setSelected({ type: "text", id: selectedTextId });
+    }
+  }, [selectedTextId]);
 
   // Load user's uploaded image
   useEffect(() => {
@@ -82,10 +84,10 @@ export default function ShirtEditorCanvas({
     const tr = trRef.current;
     if (!tr) return;
 
-    if (selected === "image" && imageRef.current) {
+    if (selected?.type === "image" && imageRef.current) {
       tr.nodes([imageRef.current]);
-    } else if (selected === "text" && textRef.current) {
-      tr.nodes([textRef.current]);
+    } else if (selected?.type === "text" && selected.id && textRefs.current[selected.id]) {
+      tr.nodes([textRefs.current[selected.id]!]);
     } else {
       tr.nodes([]);
     }
@@ -97,31 +99,16 @@ export default function ShirtEditorCanvas({
     setSelected(null);
   }, [side]);
 
-  // Drag bound function — clamp center position to print area
-  const imageDragBound = useCallback(
-    (pos: { x: number; y: number }) => {
-      return {
-        x: clamp(pos.x, printArea.x * scaleX, (printArea.x + printArea.width) * scaleX),
-        y: clamp(pos.y, printArea.y * scaleY, (printArea.y + printArea.height) * scaleY),
-      };
-    },
+  const dragBound = useCallback(
+    (pos: { x: number; y: number }) => ({
+      x: clamp(pos.x, printArea.x * scaleX, (printArea.x + printArea.width) * scaleX),
+      y: clamp(pos.y, printArea.y * scaleY, (printArea.y + printArea.height) * scaleY),
+    }),
     [printArea, scaleX, scaleY]
   );
 
-  const textDragBound = useCallback(
-    (pos: { x: number; y: number }) => {
-      return {
-        x: clamp(pos.x, printArea.x * scaleX, (printArea.x + printArea.width) * scaleX),
-        y: clamp(pos.y, printArea.y * scaleY, (printArea.y + printArea.height) * scaleY),
-      };
-    },
-    [printArea, scaleX, scaleY]
-  );
-
-  // Handle image drag end
   const onImageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    // Positions are in the scaled coordinate space, divide by scale to get logical coords
     callbacksRef.current.onImagePosChange({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
@@ -129,33 +116,28 @@ export default function ShirtEditorCanvas({
     });
   }, [scaleX, scaleY, imagePos.scale]);
 
-  // Handle text drag end
-  const onTextDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+  const onTextDragEnd = useCallback((id: string) => (e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    callbacksRef.current.onTextPosChange({
+    const item = textItems.find((t) => t.id === id);
+    callbacksRef.current.onTextItemPosChange(id, {
       x: node.x() / scaleX,
       y: node.y() / scaleY,
-      scale: textPos.scale,
+      scale: item?.pos.scale ?? 1,
     });
-  }, [scaleX, scaleY, textPos.scale]);
+  }, [scaleX, scaleY, textItems]);
 
-  // Handle transform end (resize via Transformer)
   const onImageTransformEnd = useCallback((e: Konva.KonvaEventObject<Event>) => {
     const node = e.target as Konva.Image;
     const newScaleX = node.scaleX();
     const newScale = imagePos.scale * newScaleX;
-
-    // Reset node scale and update dimensions
     node.scaleX(1);
     node.scaleY(1);
-
     const newW = IMAGE_BASE * newScale;
     const newH = IMAGE_BASE * newScale;
     node.width(newW);
     node.height(newH);
     node.offsetX(newW / 2);
     node.offsetY(newH / 2);
-
     callbacksRef.current.onImagePosChange({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
@@ -163,36 +145,33 @@ export default function ShirtEditorCanvas({
     });
   }, [scaleX, scaleY, imagePos.scale]);
 
-  const onTextTransformEnd = useCallback((e: Konva.KonvaEventObject<Event>) => {
+  const onTextTransformEnd = useCallback((id: string) => (e: Konva.KonvaEventObject<Event>) => {
     const node = e.target as Konva.Text;
+    const item = textItems.find((t) => t.id === id);
+    const prevScale = item?.pos.scale ?? 1;
     const newScaleX = node.scaleX();
-    const newScale = textPos.scale * newScaleX;
-
-    // Reset node scale
+    const newScale = prevScale * newScaleX;
     node.scaleX(1);
     node.scaleY(1);
-
-    // Update font size with new scale
-    const newFontSize = fontSize * newScale;
+    const newFontSize = (item?.fontSize ?? 24) * newScale;
     node.fontSize(newFontSize);
-
-    // Re-center offsets
     node.offsetX(node.width() / 2);
     node.offsetY(node.height() / 2);
-
-    callbacksRef.current.onTextPosChange({
+    callbacksRef.current.onTextItemPosChange(id, {
       x: node.x() / scaleX,
       y: node.y() / scaleY,
       scale: newScale,
     });
-  }, [scaleX, scaleY, textPos.scale, fontSize]);
+  }, [scaleX, scaleY, textItems]);
 
-  // Click on stage background clears selection
   const onStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     if (e.target === e.target.getStage()) {
       setSelected(null);
+      onDeselect();
     }
-  }, []);
+  }, [onDeselect]);
+
+  const hasContent = imageData || textItems.length > 0;
 
   return (
     <div ref={containerRef} style={{ width: "100%", aspectRatio: `${LOGICAL_WIDTH}/${LOGICAL_HEIGHT}` }}>
@@ -240,41 +219,45 @@ export default function ShirtEditorCanvas({
                   offsetX={(imgW * scaleX) / 2}
                   offsetY={(imgH * scaleY) / 2}
                   draggable
-                  dragBoundFunc={imageDragBound}
-                  onClick={() => setSelected("image")}
-                  onTap={() => setSelected("image")}
+                  dragBoundFunc={dragBound}
+                  onClick={() => { setSelected({ type: "image" }); onSelect("image"); }}
+                  onTap={() => { setSelected({ type: "image" }); onSelect("image"); }}
                   onDragEnd={onImageDragEnd}
                   onTransformEnd={onImageTransformEnd}
                 />
               )}
 
-              {/* User text */}
-              {displayText && (
-                <KText
-                  text={displayText}
-                  x={textPos.x * scaleX}
-                  y={textPos.y * scaleY}
-                  fontSize={scaledFontSize * scaleX}
-                  fontFamily={fontFamily}
-                  fill={textColor}
-                  fontStyle="600"
-                  align="center"
-                  verticalAlign="middle"
-                  draggable
-                  dragBoundFunc={textDragBound}
-                  onClick={() => setSelected("text")}
-                  onTap={() => setSelected("text")}
-                  onDragEnd={onTextDragEnd}
-                  onTransformEnd={onTextTransformEnd}
-                  ref={(node: Konva.Text | null) => {
-                    (textRef as React.MutableRefObject<Konva.Text | null>).current = node;
-                    if (node) {
-                      node.offsetX(node.width() / 2);
-                      node.offsetY(node.height() / 2);
-                    }
-                  }}
-                />
-              )}
+              {/* Multiple user text items */}
+              {textItems.map((item) => {
+                const scaledFontSize = item.fontSize * item.pos.scale;
+                return (
+                  <KText
+                    key={item.id}
+                    text={item.text}
+                    x={item.pos.x * scaleX}
+                    y={item.pos.y * scaleY}
+                    fontSize={scaledFontSize * scaleX}
+                    fontFamily={item.fontFamily}
+                    fill={item.textColor}
+                    fontStyle="600"
+                    align="center"
+                    verticalAlign="middle"
+                    draggable
+                    dragBoundFunc={dragBound}
+                    onClick={() => { setSelected({ type: "text", id: item.id }); onSelect("text", item.id); }}
+                    onTap={() => { setSelected({ type: "text", id: item.id }); onSelect("text", item.id); }}
+                    onDragEnd={onTextDragEnd(item.id)}
+                    onTransformEnd={onTextTransformEnd(item.id)}
+                    ref={(node: Konva.Text | null) => {
+                      textRefs.current[item.id] = node;
+                      if (node) {
+                        node.offsetX(node.width() / 2);
+                        node.offsetY(node.height() / 2);
+                      }
+                    }}
+                  />
+                );
+              })}
             </Group>
 
             {/* Transformer for selected element */}
@@ -294,7 +277,7 @@ export default function ShirtEditorCanvas({
 
           {/* Hint text layer */}
           <Layer listening={false}>
-            {(imageData || displayText) && !selected && (
+            {hasContent && !selected && (
               <KText
                 text="Click to select · Drag to move · Corners to resize"
                 x={0}

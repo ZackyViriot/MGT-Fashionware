@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import ShirtEditor from "@/components/ShirtEditor";
 import { useCart } from "@/utils/cart-context";
-import type { ElementPosition } from "@/utils/cart-context";
+import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import { SHIRT_COLORS } from "@/constants/shirt-colors";
 import { FONT_GROUPS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT, getTextColors } from "@/constants/design-config";
 import type { ShirtSide } from "@/constants/shirt-config";
@@ -14,31 +14,27 @@ const SIZE_CATEGORIES = [
 ];
 
 const DEFAULT_IMAGE_POS: ElementPosition = { x: 100, y: 110, scale: 1 };
-const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 185, scale: 1 };
-const DEFAULT_TEXT_ONLY_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
+const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
+
+let nextTextId = 1;
+function makeTextId() {
+  return `t-${nextTextId++}-${Date.now()}`;
+}
 
 interface SideState {
-  text: string;
-  textColor: string;
-  fontSize: number;
-  fontFamily: string;
   imageData: string;
   imageName: string;
   imagePos: ElementPosition;
-  textPos: ElementPosition;
+  textItems: TextItem[];
   fontGroupIdx: number;
 }
 
-function defaultSideState(shirtColor: string): SideState {
+function defaultSideState(): SideState {
   return {
-    text: "",
-    textColor: getTextColors(shirtColor)[0].value,
-    fontSize: FONT_SIZE_DEFAULT,
-    fontFamily: FONT_GROUPS[0].fonts[0].value,
     imageData: "",
     imageName: "",
     imagePos: DEFAULT_IMAGE_POS,
-    textPos: DEFAULT_TEXT_POS,
+    textItems: [],
     fontGroupIdx: 0,
   };
 }
@@ -49,40 +45,38 @@ export default function CustomDesignerPage() {
 
   const [shirtColor, setShirtColor] = useState(SHIRT_COLORS[0].value);
   const [activeSide, setActiveSide] = useState<ShirtSide>("front");
-  const [frontDesign, setFrontDesign] = useState<SideState>(() => defaultSideState(SHIRT_COLORS[0].value));
-  const [backDesign, setBackDesign] = useState<SideState>(() => defaultSideState(SHIRT_COLORS[0].value));
+  const [frontDesign, setFrontDesign] = useState<SideState>(defaultSideState);
+  const [backDesign, setBackDesign] = useState<SideState>(defaultSideState);
   const [sizeCategory, setSizeCategory] = useState(0);
   const [size, setSize] = useState("M");
   const [added, setAdded] = useState(false);
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
 
   const current = activeSide === "front" ? frontDesign : backDesign;
   const setCurrent = activeSide === "front" ? setFrontDesign : setBackDesign;
 
   const currentTextColors = getTextColors(shirtColor);
-  const hasText = current.text.trim().length > 0;
   const hasImage = current.imageData.length > 0;
+  const selectedTextItem = current.textItems.find((t) => t.id === selectedTextId) ?? null;
 
-  // canAdd = either side has content
-  const frontHasContent = frontDesign.text.trim().length > 0 || frontDesign.imageData.length > 0;
-  const backHasContent = backDesign.text.trim().length > 0 || backDesign.imageData.length > 0;
+  const frontHasContent = frontDesign.textItems.length > 0 || frontDesign.imageData.length > 0;
+  const backHasContent = backDesign.textItems.length > 0 || backDesign.imageData.length > 0;
   const canAdd = frontHasContent || backHasContent;
 
   function handleShirtColorChange(color: string) {
     setShirtColor(color);
     const newOptions = getTextColors(color);
-    // Validate text colors on both sides
-    setFrontDesign((prev) => {
-      if (!newOptions.find((c) => c.value === prev.textColor)) {
-        return { ...prev, textColor: newOptions[0].value };
-      }
-      return prev;
+    const fixColors = (prev: SideState): SideState => ({
+      ...prev,
+      textItems: prev.textItems.map((t) => {
+        if (!newOptions.find((c) => c.value === t.textColor)) {
+          return { ...t, textColor: newOptions[0].value };
+        }
+        return t;
+      }),
     });
-    setBackDesign((prev) => {
-      if (!newOptions.find((c) => c.value === prev.textColor)) {
-        return { ...prev, textColor: newOptions[0].value };
-      }
-      return prev;
-    });
+    setFrontDesign(fixColors);
+    setBackDesign(fixColors);
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -109,7 +103,6 @@ export default function CustomDesignerPage() {
         imageData: compressed,
         imageName: file.name,
         imagePos: DEFAULT_IMAGE_POS,
-        textPos: prev.text.trim() ? prev.textPos : DEFAULT_TEXT_POS,
       }));
       URL.revokeObjectURL(img.src);
     };
@@ -122,17 +115,81 @@ export default function CustomDesignerPage() {
       imageData: "",
       imageName: "",
       imagePos: DEFAULT_IMAGE_POS,
-      textPos: prev.imageData ? DEFAULT_TEXT_ONLY_POS : prev.textPos,
     }));
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleAddToCart() {
+  function addTextField() {
+    const id = makeTextId();
+    const defaultColor = currentTextColors[0].value;
+    const newItem: TextItem = {
+      id,
+      text: "",
+      textColor: defaultColor,
+      fontSize: FONT_SIZE_DEFAULT,
+      fontFamily: FONT_GROUPS[0].fonts[0].value,
+      pos: DEFAULT_TEXT_POS,
+    };
+    setCurrent((prev) => ({ ...prev, textItems: [...prev.textItems, newItem] }));
+    setSelectedTextId(id);
+  }
+
+  function removeTextField(id: string) {
+    setCurrent((prev) => ({
+      ...prev,
+      textItems: prev.textItems.filter((t) => t.id !== id),
+    }));
+    if (selectedTextId === id) setSelectedTextId(null);
+  }
+
+  function updateTextItem(id: string, updates: Partial<TextItem>) {
+    setCurrent((prev) => ({
+      ...prev,
+      textItems: prev.textItems.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  }
+
+  function handleSelect(type: "image" | "text", id?: string) {
+    setSelectedTextId(type === "text" && id ? id : null);
+  }
+
+  function handleDeselect() {
+    setSelectedTextId(null);
+  }
+
+  async function handleAddToCart() {
     const sizeLabel = sizeCategory === 1 ? `W-${size}` : size;
-    const fHasText = frontDesign.text.trim().length > 0;
-    const fHasImage = frontDesign.imageData.length > 0;
-    const bHasText = backDesign.text.trim().length > 0;
-    const bHasImage = backDesign.imageData.length > 0;
+
+    const buildSide = (s: SideState) => {
+      const hasTexts = s.textItems.length > 0;
+      const hasImg = s.imageData.length > 0;
+      if (!hasTexts && !hasImg) return undefined;
+      return {
+        imageData: hasImg ? s.imageData : undefined,
+        imagePos: hasImg ? s.imagePos : undefined,
+        textItems: hasTexts ? s.textItems : undefined,
+      };
+    };
+
+    const frontData = buildSide(frontDesign);
+    const backData = buildSide(backDesign);
+
+    // Save to Supabase
+    try {
+      await fetch("/api/custom-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shirtColor,
+          shirtColorName: SHIRT_COLORS.find((c) => c.value === shirtColor)?.name,
+          size: sizeLabel,
+          front: frontData,
+          back: backData,
+        }),
+      });
+    } catch {
+      // Don't block cart add if save fails
+    }
 
     addItem({
       productId: `custom-${Date.now()}`,
@@ -144,35 +201,16 @@ export default function CustomDesignerPage() {
       isCustom: true,
       customDesign: {
         shirtColor,
-        front: (fHasText || fHasImage) ? {
-          text: fHasText ? frontDesign.text : undefined,
-          textColor: fHasText ? frontDesign.textColor : undefined,
-          fontSize: fHasText ? frontDesign.fontSize : undefined,
-          fontFamily: fHasText ? frontDesign.fontFamily : undefined,
-          imageData: fHasImage ? frontDesign.imageData : undefined,
-          imagePos: fHasImage ? frontDesign.imagePos : undefined,
-          textPos: fHasText ? frontDesign.textPos : undefined,
-        } : undefined,
-        back: (bHasText || bHasImage) ? {
-          text: bHasText ? backDesign.text : undefined,
-          textColor: bHasText ? backDesign.textColor : undefined,
-          fontSize: bHasText ? backDesign.fontSize : undefined,
-          fontFamily: bHasText ? backDesign.fontFamily : undefined,
-          imageData: bHasImage ? backDesign.imageData : undefined,
-          imagePos: bHasImage ? backDesign.imagePos : undefined,
-          textPos: bHasText ? backDesign.textPos : undefined,
-        } : undefined,
+        front: frontData,
+        back: backData,
       },
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
 
-  const effectiveTextPos = hasText
-    ? current.textPos
-    : hasImage
-      ? DEFAULT_TEXT_POS
-      : DEFAULT_TEXT_ONLY_POS;
+  // Filter out empty text items for the canvas (don't render blank nodes)
+  const visibleTextItems = current.textItems.filter((t) => t.text.trim().length > 0);
 
   return (
     <section className="px-6 py-10">
@@ -187,12 +225,11 @@ export default function CustomDesignerPage() {
         <div className="grid lg:grid-cols-2 gap-10">
           {/* Left — Interactive Editor */}
           <div className="bg-surface rounded-2xl p-8 lg:sticky lg:top-20 lg:self-start">
-            {/* Front / Back toggle */}
             <div className="flex justify-center gap-1 mb-6">
               {(["front", "back"] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setActiveSide(s)}
+                  onClick={() => { setActiveSide(s); setSelectedTextId(null); }}
                   className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
                     activeSide === s
                       ? "bg-dark text-white"
@@ -206,15 +243,14 @@ export default function CustomDesignerPage() {
             <div className="flex items-center justify-center">
               <ShirtEditor
                 shirtColor={shirtColor}
-                text={current.text || undefined}
-                textColor={current.textColor}
-                fontFamily={current.fontFamily}
-                fontSize={current.fontSize}
                 imageData={current.imageData || undefined}
                 imagePos={current.imagePos}
-                textPos={effectiveTextPos}
                 onImagePosChange={(pos) => setCurrent((prev) => ({ ...prev, imagePos: pos }))}
-                onTextPosChange={(pos) => setCurrent((prev) => ({ ...prev, textPos: pos }))}
+                textItems={visibleTextItems}
+                onTextItemPosChange={(id, pos) => updateTextItem(id, { pos })}
+                selectedTextId={selectedTextId}
+                onSelect={handleSelect}
+                onDeselect={handleDeselect}
                 side={activeSide}
                 className="w-full max-w-sm"
               />
@@ -290,22 +326,63 @@ export default function CustomDesignerPage() {
               />
             </div>
 
-            {/* ── Custom Text ── */}
+            {/* ── Text Fields ── */}
             <div>
-              <label className="block text-sm font-semibold mb-3">Text ({activeSide})</label>
-              <input
-                type="text"
-                value={current.text}
-                onChange={(e) => setCurrent((prev) => ({ ...prev, text: e.target.value }))}
-                placeholder="Enter your text..."
-                maxLength={14}
-                className="w-full bg-surface rounded-lg px-4 py-3 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200"
-              />
-              <p className="text-xs text-muted mt-1">{current.text.length}/14 characters</p>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-semibold">Text ({activeSide})</label>
+                <button
+                  onClick={addTextField}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-dark text-white hover:bg-dark/80 transition-colors duration-200 cursor-pointer"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Add Text
+                </button>
+              </div>
+
+              {current.textItems.length === 0 ? (
+                <p className="text-xs text-muted">No text added yet. Click &ldquo;Add Text&rdquo; to start.</p>
+              ) : (
+                <div className="space-y-2">
+                  {current.textItems.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedTextId(item.id)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 cursor-pointer ${
+                        selectedTextId === item.id
+                          ? "border-primary bg-surface ring-1 ring-primary/20"
+                          : "border-border hover:border-muted"
+                      }`}
+                    >
+                      <span className="text-[10px] text-muted w-5 shrink-0">#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) => updateTextItem(item.id, { text: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Enter text..."
+                        maxLength={14}
+                        className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-muted shrink-0">{item.text.length}/14</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeTextField(item.id); }}
+                        className="text-muted hover:text-red-500 transition-colors duration-200 cursor-pointer shrink-0"
+                        aria-label="Remove text"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <path d="M6 6l12 12M6 18L18 6" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* ── Text styling (visible when text entered) ── */}
-            {hasText && (
+            {/* ── Selected Text Styling ── */}
+            {selectedTextItem && (
               <>
                 {/* Text Color */}
                 <div>
@@ -314,10 +391,10 @@ export default function CustomDesignerPage() {
                     {currentTextColors.map((c) => (
                       <button
                         key={c.value}
-                        onClick={() => setCurrent((prev) => ({ ...prev, textColor: c.value }))}
+                        onClick={() => updateTextItem(selectedTextItem.id, { textColor: c.value })}
                         title={c.name}
                         className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
-                          current.textColor === c.value
+                          selectedTextItem.textColor === c.value
                             ? "border-primary scale-110 ring-2 ring-primary/20"
                             : "border-border hover:border-muted"
                         }`}
@@ -326,14 +403,13 @@ export default function CustomDesignerPage() {
                     ))}
                   </div>
                   <p className="text-xs text-muted mt-2">
-                    {currentTextColors.find((c) => c.value === current.textColor)?.name}
+                    {currentTextColors.find((c) => c.value === selectedTextItem.textColor)?.name}
                   </p>
                 </div>
 
-                {/* Font family — grouped tabs */}
+                {/* Font family */}
                 <div>
                   <label className="block text-sm font-semibold mb-3">Font</label>
-                  {/* Group tabs */}
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {FONT_GROUPS.map((g, i) => (
                       <button
@@ -349,14 +425,13 @@ export default function CustomDesignerPage() {
                       </button>
                     ))}
                   </div>
-                  {/* Font buttons */}
                   <div className="grid grid-cols-2 gap-1.5">
                     {FONT_GROUPS[current.fontGroupIdx].fonts.map((f) => (
                       <button
                         key={f.value}
-                        onClick={() => setCurrent((prev) => ({ ...prev, fontFamily: f.value }))}
+                        onClick={() => updateTextItem(selectedTextItem.id, { fontFamily: f.value })}
                         className={`px-3 py-2 rounded-lg border text-sm truncate transition-all duration-200 cursor-pointer ${
-                          current.fontFamily === f.value
+                          selectedTextItem.fontFamily === f.value
                             ? "border-primary bg-dark text-white"
                             : "border-border bg-surface text-primary hover:border-muted"
                         }`}
@@ -368,10 +443,10 @@ export default function CustomDesignerPage() {
                   </div>
                 </div>
 
-                {/* Font Size — slider */}
+                {/* Font Size */}
                 <div>
                   <label className="block text-sm font-semibold mb-3">
-                    Text Size <span className="text-muted font-normal">({current.fontSize}px)</span>
+                    Text Size <span className="text-muted font-normal">({selectedTextItem.fontSize}px)</span>
                   </label>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-muted w-6 text-right">{FONT_SIZE_MIN}</span>
@@ -379,8 +454,8 @@ export default function CustomDesignerPage() {
                       type="range"
                       min={FONT_SIZE_MIN}
                       max={FONT_SIZE_MAX}
-                      value={current.fontSize}
-                      onChange={(e) => setCurrent((prev) => ({ ...prev, fontSize: Number(e.target.value) }))}
+                      value={selectedTextItem.fontSize}
+                      onChange={(e) => updateTextItem(selectedTextItem.id, { fontSize: Number(e.target.value) })}
                       className="flex-1 accent-dark cursor-pointer"
                     />
                     <span className="text-xs text-muted w-6">{FONT_SIZE_MAX}</span>

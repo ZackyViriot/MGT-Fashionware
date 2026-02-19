@@ -16,10 +16,10 @@ export const SHIRT_CONFIG: Record<
 > = {
   front: {
     imagePath: "/shirts/front.png",
-    printArea: { x: 52, y: 55, width: 96, height: 130 },
+    printArea: { x: 0, y: 0, width: 200, height: 240 },
   },
   back: {
     imagePath: "/shirts/back.png",
-    printArea: { x: 52, y: 45, width: 96, height: 140 },
+    printArea: { x: 0, y: 0, width: 200, height: 240 },
   },
 };

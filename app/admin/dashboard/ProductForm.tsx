@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import type { Product, ProductDesign } from "@/types/product";
-import type { ElementPosition } from "@/utils/cart-context";
+import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import { SHIRT_COLORS } from "@/constants/shirt-colors";
 import { LIGHT_SHIRT_VALUES } from "@/constants/shirt-colors";
 import { FONT_GROUPS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT, getTextColors } from "@/constants/design-config";
@@ -17,8 +17,12 @@ const WOMEN_SIZES = ["XS", "S", "M", "L", "XL"];
 const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 const DEFAULT_IMAGE_POS: ElementPosition = { x: 100, y: 110, scale: 1 };
-const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 185, scale: 1 };
-const DEFAULT_TEXT_ONLY_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
+const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
+
+let nextAdminTextId = 1;
+function makeTextId() {
+  return `at-${nextAdminTextId++}-${Date.now()}`;
+}
 
 function getSizesForGenders(genders: string[]): string[] {
   if (genders.includes("Men") && genders.includes("Women")) return ALL_SIZES;
@@ -40,42 +44,63 @@ interface ProductFormProps {
 }
 
 interface SideState {
-  text: string;
-  textColor: string;
-  fontSize: number;
-  fontFamily: string;
   imageData: string;
   imageName: string;
   imagePos: ElementPosition;
-  textPos: ElementPosition;
+  textItems: TextItem[];
   fontGroupIdx: number;
 }
 
 function defaultSideState(): SideState {
   return {
-    text: "",
-    textColor: "#ffffff",
-    fontSize: FONT_SIZE_DEFAULT,
-    fontFamily: FONT_GROUPS[0].fonts[0].value,
     imageData: "",
     imageName: "",
     imagePos: DEFAULT_IMAGE_POS,
-    textPos: DEFAULT_TEXT_POS,
+    textItems: [],
     fontGroupIdx: 0,
   };
 }
 
-function sideStateFromDesign(d: { text?: string; textColor?: string; fontSize?: number; fontFamily?: string; imageData?: string; imagePos?: { x: number; y: number; scale: number }; textPos?: { x: number; y: number; scale: number } } | undefined): SideState {
+function sideStateFromDesign(d: {
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  imageData?: string;
+  imagePos?: { x: number; y: number; scale: number };
+  textPos?: { x: number; y: number; scale: number };
+  textItems?: { id: string; text: string; textColor: string; fontSize: number; fontFamily: string; pos: { x: number; y: number; scale: number } }[];
+} | undefined): SideState {
   if (!d) return defaultSideState();
+
+  // If the design already has textItems, use them
+  let textItems: TextItem[] = [];
+  if (d.textItems && d.textItems.length > 0) {
+    textItems = d.textItems.map((t) => ({
+      id: t.id || makeTextId(),
+      text: t.text,
+      textColor: t.textColor,
+      fontSize: t.fontSize,
+      fontFamily: t.fontFamily,
+      pos: t.pos,
+    }));
+  } else if (d.text) {
+    // Legacy single text — convert to a text item
+    textItems = [{
+      id: makeTextId(),
+      text: d.text,
+      textColor: d.textColor ?? "#ffffff",
+      fontSize: d.fontSize ?? FONT_SIZE_DEFAULT,
+      fontFamily: d.fontFamily ?? FONT_GROUPS[0].fonts[0].value,
+      pos: d.textPos ?? DEFAULT_TEXT_POS,
+    }];
+  }
+
   return {
-    text: d.text ?? "",
-    textColor: d.textColor ?? "#ffffff",
-    fontSize: d.fontSize ?? FONT_SIZE_DEFAULT,
-    fontFamily: d.fontFamily ?? FONT_GROUPS[0].fonts[0].value,
     imageData: d.imageData ?? "",
     imageName: "",
     imagePos: d.imagePos ?? DEFAULT_IMAGE_POS,
-    textPos: d.textPos ?? DEFAULT_TEXT_POS,
+    textItems,
     fontGroupIdx: 0,
   };
 }
@@ -92,7 +117,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   );
   const [sizes, setSizes] = useState<string[]>(editProduct?.sizes ?? []);
 
-  // Selected color hex values (from SHIRT_COLORS)
   const [selectedColors, setSelectedColors] = useState<string[]>(() => {
     if (editProduct?.color_variants && editProduct.color_variants.length > 0) {
       return editProduct.color_variants.map((v) => {
@@ -103,7 +127,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     return [];
   });
 
-  // Image data per color (keyed by hex value) — only used when custom design is OFF
   const [colorImages, setColorImages] = useState<Record<string, ColorImageEntry>>(() => {
     if (editProduct?.color_variants && editProduct.color_variants.length > 0 && !editProduct.custom_design) {
       const images: Record<string, ColorImageEntry> = {};
@@ -117,7 +140,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     return {};
   });
 
-  // Custom design state — per-side
   const [customDesignEnabled, setCustomDesignEnabled] = useState(!!editProduct?.custom_design);
   const [activeSide, setActiveSide] = useState<ShirtSide>("front");
 
@@ -132,6 +154,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   const currentDesign = activeSide === "front" ? frontDesign : backDesign;
   const setCurrentDesign = activeSide === "front" ? setFrontDesign : setBackDesign;
 
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -141,18 +164,10 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   const supabase = createClient();
 
   const availableSizes = getSizesForGenders(genderSelections);
-
-  // For the shirt editor preview, use the first selected color or default to black
   const previewShirtColor = selectedColors[0] ?? "#0a0a0a";
   const currentTextColors = getTextColors(previewShirtColor);
-  const hasDesignText = currentDesign.text.trim().length > 0;
   const hasDesignImage = currentDesign.imageData.length > 0;
-
-  const effectiveTextPos = hasDesignText
-    ? currentDesign.textPos
-    : hasDesignImage
-      ? DEFAULT_TEXT_POS
-      : DEFAULT_TEXT_ONLY_POS;
+  const selectedTextItem = currentDesign.textItems.find((t) => t.id === selectedTextId) ?? null;
 
   function toggleGender(value: string) {
     setGenderSelections((prev) => {
@@ -195,19 +210,17 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
 
   function handleShirtColorChange(hex: string) {
     const newOptions = getTextColors(hex);
-    // Validate text colors on both sides
-    setFrontDesign((prev) => {
-      if (!newOptions.find((c) => c.value === prev.textColor)) {
-        return { ...prev, textColor: newOptions[0].value };
-      }
-      return prev;
+    const fixColors = (prev: SideState): SideState => ({
+      ...prev,
+      textItems: prev.textItems.map((t) => {
+        if (!newOptions.find((c) => c.value === t.textColor)) {
+          return { ...t, textColor: newOptions[0].value };
+        }
+        return t;
+      }),
     });
-    setBackDesign((prev) => {
-      if (!newOptions.find((c) => c.value === prev.textColor)) {
-        return { ...prev, textColor: newOptions[0].value };
-      }
-      return prev;
-    });
+    setFrontDesign(fixColors);
+    setBackDesign(fixColors);
   }
 
   function handleDesignImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -234,7 +247,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
         imageData: compressed,
         imageName: file.name,
         imagePos: DEFAULT_IMAGE_POS,
-        textPos: prev.text.trim() ? prev.textPos : DEFAULT_TEXT_POS,
       }));
       URL.revokeObjectURL(img.src);
     };
@@ -251,6 +263,44 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     if (designFileRef.current) designFileRef.current.value = "";
   }
 
+  function addTextField() {
+    const id = makeTextId();
+    const defaultColor = currentTextColors[0].value;
+    const newItem: TextItem = {
+      id,
+      text: "",
+      textColor: defaultColor,
+      fontSize: FONT_SIZE_DEFAULT,
+      fontFamily: FONT_GROUPS[0].fonts[0].value,
+      pos: DEFAULT_TEXT_POS,
+    };
+    setCurrentDesign((prev) => ({ ...prev, textItems: [...prev.textItems, newItem] }));
+    setSelectedTextId(id);
+  }
+
+  function removeTextField(id: string) {
+    setCurrentDesign((prev) => ({
+      ...prev,
+      textItems: prev.textItems.filter((t) => t.id !== id),
+    }));
+    if (selectedTextId === id) setSelectedTextId(null);
+  }
+
+  function updateTextItem(id: string, updates: Partial<TextItem>) {
+    setCurrentDesign((prev) => ({
+      ...prev,
+      textItems: prev.textItems.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  }
+
+  function handleSelect(type: "image" | "text", id?: string) {
+    setSelectedTextId(type === "text" && id ? id : null);
+  }
+
+  function handleDeselect() {
+    setSelectedTextId(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -262,14 +312,12 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       return;
     }
 
-    // Build color_variants and handle images
     const colorVariants: { color: string; hex: string; image: string }[] = [];
     const allImageUrls: string[] = [];
 
     if (customDesignEnabled) {
-      // Validate design has content on at least one side
-      const fHasContent = frontDesign.text.trim().length > 0 || frontDesign.imageData.length > 0;
-      const bHasContent = backDesign.text.trim().length > 0 || backDesign.imageData.length > 0;
+      const fHasContent = frontDesign.textItems.length > 0 || frontDesign.imageData.length > 0;
+      const bHasContent = backDesign.textItems.length > 0 || backDesign.imageData.length > 0;
 
       if (!fHasContent && !bHasContent) {
         setMessage({ type: "error", text: "Add text or an image to the custom design." });
@@ -277,13 +325,11 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
         return;
       }
 
-      // Custom design products don't need per-color images — set image to empty
       for (const hex of selectedColors) {
         const colorName = SHIRT_COLORS.find((sc) => sc.value === hex)?.name ?? "";
         colorVariants.push({ color: colorName, hex, image: "" });
       }
     } else {
-      // Standard mode: validate each color has an image
       const colorsMissingImages = selectedColors.filter((hex) => {
         const entry = colorImages[hex];
         return !entry || (!entry.file && !entry.existingUrl);
@@ -333,33 +379,29 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
 
     const gender = genderSelections.join(",") || null;
 
-    // Build custom_design JSON if enabled — always use { front, back } format
     let custom_design: ProductDesign | null = null;
     if (customDesignEnabled) {
-      const fHasText = frontDesign.text.trim().length > 0;
-      const fHasImage = frontDesign.imageData.length > 0;
-      const bHasText = backDesign.text.trim().length > 0;
-      const bHasImage = backDesign.imageData.length > 0;
+      const buildSide = (s: SideState) => {
+        const hasTexts = s.textItems.length > 0;
+        const hasImg = s.imageData.length > 0;
+        if (!hasTexts && !hasImg) return undefined;
+        return {
+          imageData: hasImg ? s.imageData : undefined,
+          imagePos: hasImg ? s.imagePos : undefined,
+          textItems: hasTexts ? s.textItems.map((t) => ({
+            id: t.id,
+            text: t.text,
+            textColor: t.textColor,
+            fontSize: t.fontSize,
+            fontFamily: t.fontFamily,
+            pos: t.pos,
+          })) : undefined,
+        };
+      };
 
       custom_design = {
-        front: (fHasText || fHasImage) ? {
-          text: fHasText ? frontDesign.text : undefined,
-          textColor: fHasText ? frontDesign.textColor : undefined,
-          fontSize: fHasText ? frontDesign.fontSize : undefined,
-          fontFamily: fHasText ? frontDesign.fontFamily : undefined,
-          imageData: fHasImage ? frontDesign.imageData : undefined,
-          imagePos: fHasImage ? frontDesign.imagePos : undefined,
-          textPos: fHasText ? frontDesign.textPos : undefined,
-        } : undefined,
-        back: (bHasText || bHasImage) ? {
-          text: bHasText ? backDesign.text : undefined,
-          textColor: bHasText ? backDesign.textColor : undefined,
-          fontSize: bHasText ? backDesign.fontSize : undefined,
-          fontFamily: bHasText ? backDesign.fontFamily : undefined,
-          imageData: bHasImage ? backDesign.imageData : undefined,
-          imagePos: bHasImage ? backDesign.imagePos : undefined,
-          textPos: bHasText ? backDesign.textPos : undefined,
-        } : undefined,
+        front: buildSide(frontDesign),
+        back: buildSide(backDesign),
       };
     }
 
@@ -376,7 +418,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     };
 
     if (isEditing) {
-      // Clean up orphaned images from storage
       if (!customDesignEnabled) {
         const oldUrls = editProduct!.images ?? [];
         const orphanedUrls = oldUrls.filter((url) => !allImageUrls.includes(url));
@@ -425,12 +466,15 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       setColorImages({});
       setCustomDesignEnabled(false);
       setActiveSide("front");
+      setSelectedTextId(null);
       setFrontDesign(defaultSideState());
       setBackDesign(defaultSideState());
       setLoading(false);
       router.refresh();
     }
   }
+
+  const visibleTextItems = currentDesign.textItems.filter((t) => t.text.trim().length > 0);
 
   const inputClass =
     "w-full bg-bg rounded-lg px-4 py-3 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200";
@@ -636,7 +680,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
               <button
                 key={s}
                 type="button"
-                onClick={() => setActiveSide(s)}
+                onClick={() => { setActiveSide(s); setSelectedTextId(null); }}
                 className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
                   activeSide === s
                     ? "bg-dark text-white"
@@ -652,15 +696,14 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
           <div className="flex justify-center bg-surface rounded-xl p-6">
             <ShirtEditor
               shirtColor={previewShirtColor}
-              text={currentDesign.text || undefined}
-              textColor={currentDesign.textColor}
-              fontFamily={currentDesign.fontFamily}
-              fontSize={currentDesign.fontSize}
               imageData={currentDesign.imageData || undefined}
               imagePos={currentDesign.imagePos}
-              textPos={effectiveTextPos}
               onImagePosChange={(pos) => setCurrentDesign((prev) => ({ ...prev, imagePos: pos }))}
-              onTextPosChange={(pos) => setCurrentDesign((prev) => ({ ...prev, textPos: pos }))}
+              textItems={visibleTextItems}
+              onTextItemPosChange={(id, pos) => updateTextItem(id, { pos })}
+              selectedTextId={selectedTextId}
+              onSelect={handleSelect}
+              onDeselect={handleDeselect}
               side={activeSide}
               className="w-full max-w-[240px]"
             />
@@ -680,7 +723,6 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                       key={hex}
                       type="button"
                       onClick={() => {
-                        // Move this color to front of selectedColors for preview
                         setSelectedColors((prev) => [hex, ...prev.filter((c) => c !== hex)]);
                         handleShirtColorChange(hex);
                       }}
@@ -746,24 +788,67 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
             />
           </div>
 
-          {/* Design Text */}
+          {/* ── Text Fields ── */}
           <div>
-            <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
-              Design Text ({activeSide})
-            </label>
-            <input
-              type="text"
-              value={currentDesign.text}
-              onChange={(e) => setCurrentDesign((prev) => ({ ...prev, text: e.target.value }))}
-              placeholder="Enter text for the shirt..."
-              maxLength={14}
-              className={inputClass}
-            />
-            <p className="text-xs text-muted mt-1">{currentDesign.text.length}/14 characters</p>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary">
+                Design Text ({activeSide})
+              </label>
+              <button
+                type="button"
+                onClick={addTextField}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-dark text-white hover:bg-dark/80 transition-colors duration-200 cursor-pointer"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Add Text
+              </button>
+            </div>
+
+            {currentDesign.textItems.length === 0 ? (
+              <p className="text-xs text-muted">No text added yet. Click &ldquo;Add Text&rdquo; to start.</p>
+            ) : (
+              <div className="space-y-2">
+                {currentDesign.textItems.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedTextId(item.id)}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 cursor-pointer ${
+                      selectedTextId === item.id
+                        ? "border-primary bg-surface ring-1 ring-primary/20"
+                        : "border-border hover:border-muted"
+                    }`}
+                  >
+                    <span className="text-[10px] text-muted w-5 shrink-0">#{idx + 1}</span>
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) => updateTextItem(item.id, { text: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Enter text..."
+                      maxLength={14}
+                      className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-muted shrink-0">{item.text.length}/14</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeTextField(item.id); }}
+                      className="text-muted hover:text-red-500 transition-colors duration-200 cursor-pointer shrink-0"
+                      aria-label="Remove text"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        <path d="M6 6l12 12M6 18L18 6" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Text styling (visible when text entered) */}
-          {hasDesignText && (
+          {/* ── Selected Text Styling ── */}
+          {selectedTextItem && (
             <>
               {/* Text Color */}
               <div>
@@ -775,10 +860,10 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     <button
                       key={c.value}
                       type="button"
-                      onClick={() => setCurrentDesign((prev) => ({ ...prev, textColor: c.value }))}
+                      onClick={() => updateTextItem(selectedTextItem.id, { textColor: c.value })}
                       title={c.name}
                       className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
-                        currentDesign.textColor === c.value
+                        selectedTextItem.textColor === c.value
                           ? "border-primary scale-110 ring-2 ring-primary/20"
                           : "border-border hover:border-muted"
                       }`}
@@ -787,7 +872,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                   ))}
                 </div>
                 <p className="text-xs text-muted mt-2">
-                  {currentTextColors.find((c) => c.value === currentDesign.textColor)?.name}
+                  {currentTextColors.find((c) => c.value === selectedTextItem.textColor)?.name}
                 </p>
               </div>
 
@@ -817,9 +902,9 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     <button
                       key={f.value}
                       type="button"
-                      onClick={() => setCurrentDesign((prev) => ({ ...prev, fontFamily: f.value }))}
+                      onClick={() => updateTextItem(selectedTextItem.id, { fontFamily: f.value })}
                       className={`px-3 py-2 rounded-lg border text-sm truncate transition-all duration-200 cursor-pointer ${
-                        currentDesign.fontFamily === f.value
+                        selectedTextItem.fontFamily === f.value
                           ? "border-primary bg-dark text-white"
                           : "border-border bg-card text-primary hover:border-muted"
                       }`}
@@ -834,7 +919,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
               {/* Font Size */}
               <div>
                 <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
-                  Text Size <span className="text-muted font-normal">({currentDesign.fontSize}px)</span>
+                  Text Size <span className="text-muted font-normal">({selectedTextItem.fontSize}px)</span>
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted w-6 text-right">{FONT_SIZE_MIN}</span>
@@ -842,8 +927,8 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     type="range"
                     min={FONT_SIZE_MIN}
                     max={FONT_SIZE_MAX}
-                    value={currentDesign.fontSize}
-                    onChange={(e) => setCurrentDesign((prev) => ({ ...prev, fontSize: Number(e.target.value) }))}
+                    value={selectedTextItem.fontSize}
+                    onChange={(e) => updateTextItem(selectedTextItem.id, { fontSize: Number(e.target.value) })}
                     className="flex-1 accent-dark cursor-pointer"
                   />
                   <span className="text-xs text-muted w-6">{FONT_SIZE_MAX}</span>

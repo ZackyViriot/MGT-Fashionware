@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ElementPosition } from "@/utils/cart-context";
+import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import type { ShirtSide } from "@/constants/shirt-config";
 
 const ShirtPreviewCanvas = dynamic(() => import("./ShirtPreviewCanvas"), {
@@ -13,30 +13,30 @@ const ShirtPreviewCanvas = dynamic(() => import("./ShirtPreviewCanvas"), {
 
 interface ShirtPreviewProps {
   shirtColor: string;
+  // Legacy single-text props
   text?: string;
   textColor?: string;
   fontFamily?: string;
   fontSize?: number;
+  textPos?: ElementPosition;
+  // Multi-text
+  textItems?: TextItem[];
+  // Image
   imageData?: string;
   imagePos?: ElementPosition;
-  textPos?: ElementPosition;
   side?: ShirtSide;
   className?: string;
 }
 
 const DEFAULT_IMAGE_POS: ElementPosition = { x: 100, y: 110, scale: 1 };
-const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 185, scale: 1 };
-const DEFAULT_TEXT_ONLY_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
 
 export default function ShirtPreview({
   className = "",
   imagePos,
-  textPos,
   imageData,
   ...rest
 }: ShirtPreviewProps) {
   const ip = imagePos ?? DEFAULT_IMAGE_POS;
-  const tp = textPos ?? (imageData ? DEFAULT_TEXT_POS : DEFAULT_TEXT_ONLY_POS);
 
   return (
     <div className={className}>
@@ -44,7 +44,6 @@ export default function ShirtPreview({
         {...rest}
         imageData={imageData}
         imagePos={ip}
-        textPos={tp}
       />
     </div>
   );

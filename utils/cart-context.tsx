@@ -8,6 +8,15 @@ export interface ElementPosition {
   scale: number;
 }
 
+export interface TextItem {
+  id: string;
+  text: string;
+  textColor: string;
+  fontSize: number;
+  fontFamily: string;
+  pos: ElementPosition;
+}
+
 export interface CustomDesignSide {
   text?: string;
   textColor?: string;
@@ -16,6 +25,7 @@ export interface CustomDesignSide {
   imageData?: string;
   imagePos?: ElementPosition;
   textPos?: ElementPosition;
+  textItems?: TextItem[];
 }
 
 export interface CustomDesign {

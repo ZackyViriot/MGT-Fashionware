@@ -4,6 +4,15 @@ export interface ColorVariant {
   image: string;
 }
 
+export interface SideDesignTextItem {
+  id: string;
+  text: string;
+  textColor: string;
+  fontSize: number;
+  fontFamily: string;
+  pos: { x: number; y: number; scale: number };
+}
+
 export interface SideDesign {
   text?: string;
   textColor?: string;
@@ -12,6 +21,7 @@ export interface SideDesign {
   imageData?: string;
   imagePos?: { x: number; y: number; scale: number };
   textPos?: { x: number; y: number; scale: number };
+  textItems?: SideDesignTextItem[];
 }
 
 export interface ProductDesign {

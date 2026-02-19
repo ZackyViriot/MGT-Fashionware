@@ -102,6 +102,7 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                           imageData={frontSide?.imageData}
                           imagePos={frontSide?.imagePos}
                           textPos={frontSide?.textPos}
+                          textItems={frontSide?.textItems}
                           side="front"
                           className="w-16 h-16"
                         />
