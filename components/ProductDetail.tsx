@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/utils/cart-context";
 import type { Product } from "@/types/product";
+import ShirtPreview from "./ShirtPreview";
 
 export default function ProductDetail({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
   const hasVariants = variants.length > 0;
+  const design = product.custom_design;
 
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -22,6 +24,8 @@ export default function ProductDetail({ product }: { product: Product }) {
   const allImages = hasVariants
     ? [variants[selectedColor]?.image].filter(Boolean) as string[]
     : product.images ?? [];
+
+  const activeShirtColor = variants[selectedColor]?.hex ?? "#0a0a0a";
 
   function handleAddToCart() {
     if (!selectedSize) return;
@@ -71,9 +75,23 @@ export default function ProductDetail({ product }: { product: Product }) {
         </nav>
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-          {/* Images */}
+          {/* Images / Shirt Preview */}
           <div className="space-y-3">
-            {allImages.length > 0 ? (
+            {design ? (
+              <div className="overflow-hidden rounded-2xl bg-surface flex items-center justify-center p-8">
+                <ShirtPreview
+                  shirtColor={activeShirtColor}
+                  text={design.text}
+                  textColor={design.textColor}
+                  fontFamily={design.fontFamily}
+                  fontSize={design.fontSize}
+                  imageData={design.imageData}
+                  imagePos={design.imagePos}
+                  textPos={design.textPos}
+                  className="w-full max-w-md"
+                />
+              </div>
+            ) : allImages.length > 0 ? (
               allImages.map((url, i) => (
                 <div key={`${selectedColor}-${i}`} className="overflow-hidden rounded-2xl bg-surface">
                   <Image

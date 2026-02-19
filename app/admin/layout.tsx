@@ -6,9 +6,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 bg-dark shrink-0">
         <div className="p-6 border-b border-white/10">
-          <Link href="/admin/dashboard" className="font-heading font-bold text-lg text-white tracking-tight">
-            MGT Admin
+          <Link href="/" className="font-heading font-bold text-lg text-white tracking-tight">
+            MGT
           </Link>
+          <p className="text-white/40 text-xs mt-1">Admin Panel</p>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
           <Link
@@ -46,8 +47,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
         <header className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border bg-bg">
-          <Link href="/admin/dashboard" className="font-heading font-bold text-lg text-primary tracking-tight">
-            MGT Admin
+          <Link href="/" className="font-heading font-bold text-lg text-primary tracking-tight">
+            MGT
           </Link>
           <Link href="/" className="text-sm text-muted hover:text-primary transition-colors duration-200">
             Store &rarr;

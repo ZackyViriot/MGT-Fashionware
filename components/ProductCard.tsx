@@ -4,22 +4,39 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@/types/product";
+import ShirtPreview from "./ShirtPreview";
 
 export default function ProductCard({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
   const fallbackImage = product.images?.[0];
   const [activeIndex, setActiveIndex] = useState(0);
+  const design = product.custom_design;
 
   const displayImage = variants.length > 0
     ? variants[activeIndex]?.image
     : fallbackImage;
 
+  const activeShirtColor = variants[activeIndex]?.hex ?? "#0a0a0a";
+
   return (
     <div className="group">
       <Link href={`/product/${product.id}`} className="block">
-        {/* Image */}
         <div className="relative overflow-hidden rounded-lg bg-surface aspect-[3/4]">
-          {displayImage ? (
+          {design ? (
+            <div className="absolute inset-0 flex items-center justify-center p-4">
+              <ShirtPreview
+                shirtColor={activeShirtColor}
+                text={design.text}
+                textColor={design.textColor}
+                fontFamily={design.fontFamily}
+                fontSize={design.fontSize}
+                imageData={design.imageData}
+                imagePos={design.imagePos}
+                textPos={design.textPos}
+                className="w-full h-full"
+              />
+            </div>
+          ) : displayImage ? (
             <Image
               src={displayImage}
               alt={product.name}
@@ -39,7 +56,6 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
       </Link>
 
-      {/* Info */}
       <div className="mt-3 space-y-0.5">
         <Link href={`/product/${product.id}`}>
           <h3 className="text-[13px] font-semibold text-primary leading-snug">
@@ -57,7 +73,6 @@ export default function ProductCard({ product }: { product: Product }) {
         </p>
       </div>
 
-      {/* Color swatches */}
       {variants.length > 1 && (
         <div className="flex items-center gap-1.5 mt-2.5">
           {variants.map((v, i) => (

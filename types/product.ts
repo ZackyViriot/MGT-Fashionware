@@ -4,6 +4,16 @@ export interface ColorVariant {
   image: string;
 }
 
+export interface ProductDesign {
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  imageData?: string;
+  imagePos?: { x: number; y: number; scale: number };
+  textPos?: { x: number; y: number; scale: number };
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -14,5 +24,6 @@ export interface Product {
   category: string | null;
   gender: string | null;
   sizes: string[];
+  custom_design: ProductDesign | null;
   created_at: string;
 }

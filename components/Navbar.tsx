@@ -51,6 +51,9 @@ export default function Navbar() {
               <Link href="/custom" className="text-sm text-muted hover:text-primary transition-colors duration-200">
                 Custom
               </Link>
+              <Link href="/admin" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                Admin
+              </Link>
             </div>
 
             <div className="flex items-center gap-4">
@@ -110,6 +113,7 @@ export default function Navbar() {
             <Link href="/men" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Men</Link>
             <Link href="/women" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Women</Link>
             <Link href="/custom" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Custom</Link>
+            <Link href="/admin" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Admin</Link>
           </div>
         )}
       </header>

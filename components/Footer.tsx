@@ -13,7 +13,7 @@ export default function Footer() {
             <p className="text-muted mt-3 text-sm">
               New arrivals, stories behind the pieces, and exclusive offers.
             </p>
-            <form onSubmit={(e) => e.preventDefault()} className="mt-6 flex gap-3 max-w-md mx-auto">
+            <form onSubmit={(e) => e.preventDefault()} className="mt-6 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
               <input
                 type="email"
                 placeholder="your@email.com"
