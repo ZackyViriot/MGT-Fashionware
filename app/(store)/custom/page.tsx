@@ -6,6 +6,7 @@ import { useCart } from "@/utils/cart-context";
 import type { ElementPosition } from "@/utils/cart-context";
 import { SHIRT_COLORS } from "@/constants/shirt-colors";
 import { FONT_GROUPS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT, getTextColors } from "@/constants/design-config";
+import type { ShirtSide } from "@/constants/shirt-config";
 
 const SIZE_CATEGORIES = [
   { label: "Unisex", sizes: ["XS", "S", "M", "L", "XL", "XXL", "3XL"] },
@@ -16,35 +17,72 @@ const DEFAULT_IMAGE_POS: ElementPosition = { x: 100, y: 110, scale: 1 };
 const DEFAULT_TEXT_POS: ElementPosition = { x: 100, y: 185, scale: 1 };
 const DEFAULT_TEXT_ONLY_POS: ElementPosition = { x: 100, y: 130, scale: 1 };
 
+interface SideState {
+  text: string;
+  textColor: string;
+  fontSize: number;
+  fontFamily: string;
+  imageData: string;
+  imageName: string;
+  imagePos: ElementPosition;
+  textPos: ElementPosition;
+  fontGroupIdx: number;
+}
+
+function defaultSideState(shirtColor: string): SideState {
+  return {
+    text: "",
+    textColor: getTextColors(shirtColor)[0].value,
+    fontSize: FONT_SIZE_DEFAULT,
+    fontFamily: FONT_GROUPS[0].fonts[0].value,
+    imageData: "",
+    imageName: "",
+    imagePos: DEFAULT_IMAGE_POS,
+    textPos: DEFAULT_TEXT_POS,
+    fontGroupIdx: 0,
+  };
+}
+
 export default function CustomDesignerPage() {
   const { addItem } = useCart();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [shirtColor, setShirtColor] = useState(SHIRT_COLORS[0].value);
-  const [customText, setCustomText] = useState("");
-  const [textColor, setTextColor] = useState(getTextColors(SHIRT_COLORS[0].value)[0].value);
-  const [fontFamily, setFontFamily] = useState(FONT_GROUPS[0].fonts[0].value);
-  const [textSizeNum, setTextSizeNum] = useState(FONT_SIZE_DEFAULT);
-  const [imageData, setImageData] = useState("");
-  const [imageName, setImageName] = useState("");
-  const [imagePos, setImagePos] = useState<ElementPosition>(DEFAULT_IMAGE_POS);
-  const [textPos, setTextPos] = useState<ElementPosition>(DEFAULT_TEXT_POS);
+  const [activeSide, setActiveSide] = useState<ShirtSide>("front");
+  const [frontDesign, setFrontDesign] = useState<SideState>(() => defaultSideState(SHIRT_COLORS[0].value));
+  const [backDesign, setBackDesign] = useState<SideState>(() => defaultSideState(SHIRT_COLORS[0].value));
   const [sizeCategory, setSizeCategory] = useState(0);
   const [size, setSize] = useState("M");
   const [added, setAdded] = useState(false);
-  const [fontGroupIdx, setFontGroupIdx] = useState(0);
+
+  const current = activeSide === "front" ? frontDesign : backDesign;
+  const setCurrent = activeSide === "front" ? setFrontDesign : setBackDesign;
 
   const currentTextColors = getTextColors(shirtColor);
-  const hasText = customText.trim().length > 0;
-  const hasImage = imageData.length > 0;
-  const canAdd = hasText || hasImage;
+  const hasText = current.text.trim().length > 0;
+  const hasImage = current.imageData.length > 0;
+
+  // canAdd = either side has content
+  const frontHasContent = frontDesign.text.trim().length > 0 || frontDesign.imageData.length > 0;
+  const backHasContent = backDesign.text.trim().length > 0 || backDesign.imageData.length > 0;
+  const canAdd = frontHasContent || backHasContent;
 
   function handleShirtColorChange(color: string) {
     setShirtColor(color);
     const newOptions = getTextColors(color);
-    if (!newOptions.find((c) => c.value === textColor)) {
-      setTextColor(newOptions[0].value);
-    }
+    // Validate text colors on both sides
+    setFrontDesign((prev) => {
+      if (!newOptions.find((c) => c.value === prev.textColor)) {
+        return { ...prev, textColor: newOptions[0].value };
+      }
+      return prev;
+    });
+    setBackDesign((prev) => {
+      if (!newOptions.find((c) => c.value === prev.textColor)) {
+        return { ...prev, textColor: newOptions[0].value };
+      }
+      return prev;
+    });
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -66,25 +104,36 @@ export default function CustomDesignerPage() {
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, width, height);
       const compressed = canvas.toDataURL("image/jpeg", 0.8);
-      setImageData(compressed);
-      setImageName(file.name);
-      setImagePos(DEFAULT_IMAGE_POS);
-      if (!hasText) setTextPos(DEFAULT_TEXT_POS);
+      setCurrent((prev) => ({
+        ...prev,
+        imageData: compressed,
+        imageName: file.name,
+        imagePos: DEFAULT_IMAGE_POS,
+        textPos: prev.text.trim() ? prev.textPos : DEFAULT_TEXT_POS,
+      }));
       URL.revokeObjectURL(img.src);
     };
     img.src = URL.createObjectURL(file);
   }
 
   function clearImage() {
-    setImageData("");
-    setImageName("");
-    setImagePos(DEFAULT_IMAGE_POS);
+    setCurrent((prev) => ({
+      ...prev,
+      imageData: "",
+      imageName: "",
+      imagePos: DEFAULT_IMAGE_POS,
+      textPos: prev.imageData ? DEFAULT_TEXT_ONLY_POS : prev.textPos,
+    }));
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (!hasImage) setTextPos(DEFAULT_TEXT_ONLY_POS);
   }
 
   function handleAddToCart() {
     const sizeLabel = sizeCategory === 1 ? `W-${size}` : size;
+    const fHasText = frontDesign.text.trim().length > 0;
+    const fHasImage = frontDesign.imageData.length > 0;
+    const bHasText = backDesign.text.trim().length > 0;
+    const bHasImage = backDesign.imageData.length > 0;
+
     addItem({
       productId: `custom-${Date.now()}`,
       name: "Custom Shirt",
@@ -95,13 +144,24 @@ export default function CustomDesignerPage() {
       isCustom: true,
       customDesign: {
         shirtColor,
-        text: hasText ? customText : undefined,
-        textColor: hasText ? textColor : undefined,
-        fontSize: hasText ? textSizeNum : undefined,
-        fontFamily: hasText ? fontFamily : undefined,
-        imageData: hasImage ? imageData : undefined,
-        imagePos: hasImage ? imagePos : undefined,
-        textPos: hasText ? textPos : undefined,
+        front: (fHasText || fHasImage) ? {
+          text: fHasText ? frontDesign.text : undefined,
+          textColor: fHasText ? frontDesign.textColor : undefined,
+          fontSize: fHasText ? frontDesign.fontSize : undefined,
+          fontFamily: fHasText ? frontDesign.fontFamily : undefined,
+          imageData: fHasImage ? frontDesign.imageData : undefined,
+          imagePos: fHasImage ? frontDesign.imagePos : undefined,
+          textPos: fHasText ? frontDesign.textPos : undefined,
+        } : undefined,
+        back: (bHasText || bHasImage) ? {
+          text: bHasText ? backDesign.text : undefined,
+          textColor: bHasText ? backDesign.textColor : undefined,
+          fontSize: bHasText ? backDesign.fontSize : undefined,
+          fontFamily: bHasText ? backDesign.fontFamily : undefined,
+          imageData: bHasImage ? backDesign.imageData : undefined,
+          imagePos: bHasImage ? backDesign.imagePos : undefined,
+          textPos: bHasText ? backDesign.textPos : undefined,
+        } : undefined,
       },
     });
     setAdded(true);
@@ -109,7 +169,7 @@ export default function CustomDesignerPage() {
   }
 
   const effectiveTextPos = hasText
-    ? textPos
+    ? current.textPos
     : hasImage
       ? DEFAULT_TEXT_POS
       : DEFAULT_TEXT_ONLY_POS;
@@ -126,20 +186,39 @@ export default function CustomDesignerPage() {
 
         <div className="grid lg:grid-cols-2 gap-10">
           {/* Left — Interactive Editor */}
-          <div className="flex items-center justify-center bg-surface rounded-2xl p-8 lg:sticky lg:top-20 lg:self-start">
-            <ShirtEditor
-              shirtColor={shirtColor}
-              text={customText || undefined}
-              textColor={textColor}
-              fontFamily={fontFamily}
-              fontSize={textSizeNum}
-              imageData={imageData || undefined}
-              imagePos={imagePos}
-              textPos={effectiveTextPos}
-              onImagePosChange={setImagePos}
-              onTextPosChange={setTextPos}
-              className="w-full max-w-sm"
-            />
+          <div className="bg-surface rounded-2xl p-8 lg:sticky lg:top-20 lg:self-start">
+            {/* Front / Back toggle */}
+            <div className="flex justify-center gap-1 mb-6">
+              {(["front", "back"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setActiveSide(s)}
+                  className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                    activeSide === s
+                      ? "bg-dark text-white"
+                      : "bg-bg text-muted hover:text-primary border border-border"
+                  }`}
+                >
+                  {s === "front" ? "Front" : "Back"}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center justify-center">
+              <ShirtEditor
+                shirtColor={shirtColor}
+                text={current.text || undefined}
+                textColor={current.textColor}
+                fontFamily={current.fontFamily}
+                fontSize={current.fontSize}
+                imageData={current.imageData || undefined}
+                imagePos={current.imagePos}
+                textPos={effectiveTextPos}
+                onImagePosChange={(pos) => setCurrent((prev) => ({ ...prev, imagePos: pos }))}
+                onTextPosChange={(pos) => setCurrent((prev) => ({ ...prev, textPos: pos }))}
+                side={activeSide}
+                className="w-full max-w-sm"
+              />
+            </div>
           </div>
 
           {/* Right — Controls */}
@@ -169,15 +248,15 @@ export default function CustomDesignerPage() {
 
             {/* ── Image Upload ── */}
             <div>
-              <label className="block text-sm font-semibold mb-3">Image</label>
-              {imageData ? (
+              <label className="block text-sm font-semibold mb-3">Image ({activeSide})</label>
+              {current.imageData ? (
                 <div className="flex items-center gap-3 bg-surface rounded-lg px-4 py-3 border border-border">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-muted shrink-0">
                     <rect x="3" y="3" width="18" height="18" rx="2" />
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <path d="M21 15l-5-5L5 21" />
                   </svg>
-                  <span className="text-sm text-primary truncate flex-1">{imageName}</span>
+                  <span className="text-sm text-primary truncate flex-1">{current.imageName}</span>
                   <button
                     onClick={clearImage}
                     className="text-muted hover:text-primary transition-colors duration-200 cursor-pointer shrink-0"
@@ -213,16 +292,16 @@ export default function CustomDesignerPage() {
 
             {/* ── Custom Text ── */}
             <div>
-              <label className="block text-sm font-semibold mb-3">Text</label>
+              <label className="block text-sm font-semibold mb-3">Text ({activeSide})</label>
               <input
                 type="text"
-                value={customText}
-                onChange={(e) => setCustomText(e.target.value)}
+                value={current.text}
+                onChange={(e) => setCurrent((prev) => ({ ...prev, text: e.target.value }))}
                 placeholder="Enter your text..."
                 maxLength={14}
                 className="w-full bg-surface rounded-lg px-4 py-3 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200"
               />
-              <p className="text-xs text-muted mt-1">{customText.length}/14 characters</p>
+              <p className="text-xs text-muted mt-1">{current.text.length}/14 characters</p>
             </div>
 
             {/* ── Text styling (visible when text entered) ── */}
@@ -235,10 +314,10 @@ export default function CustomDesignerPage() {
                     {currentTextColors.map((c) => (
                       <button
                         key={c.value}
-                        onClick={() => setTextColor(c.value)}
+                        onClick={() => setCurrent((prev) => ({ ...prev, textColor: c.value }))}
                         title={c.name}
                         className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
-                          textColor === c.value
+                          current.textColor === c.value
                             ? "border-primary scale-110 ring-2 ring-primary/20"
                             : "border-border hover:border-muted"
                         }`}
@@ -247,7 +326,7 @@ export default function CustomDesignerPage() {
                     ))}
                   </div>
                   <p className="text-xs text-muted mt-2">
-                    {currentTextColors.find((c) => c.value === textColor)?.name}
+                    {currentTextColors.find((c) => c.value === current.textColor)?.name}
                   </p>
                 </div>
 
@@ -259,9 +338,9 @@ export default function CustomDesignerPage() {
                     {FONT_GROUPS.map((g, i) => (
                       <button
                         key={g.label}
-                        onClick={() => setFontGroupIdx(i)}
+                        onClick={() => setCurrent((prev) => ({ ...prev, fontGroupIdx: i }))}
                         className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-200 cursor-pointer ${
-                          fontGroupIdx === i
+                          current.fontGroupIdx === i
                             ? "bg-dark text-white"
                             : "bg-surface text-muted hover:text-primary border border-border"
                         }`}
@@ -272,12 +351,12 @@ export default function CustomDesignerPage() {
                   </div>
                   {/* Font buttons */}
                   <div className="grid grid-cols-2 gap-1.5">
-                    {FONT_GROUPS[fontGroupIdx].fonts.map((f) => (
+                    {FONT_GROUPS[current.fontGroupIdx].fonts.map((f) => (
                       <button
                         key={f.value}
-                        onClick={() => setFontFamily(f.value)}
+                        onClick={() => setCurrent((prev) => ({ ...prev, fontFamily: f.value }))}
                         className={`px-3 py-2 rounded-lg border text-sm truncate transition-all duration-200 cursor-pointer ${
-                          fontFamily === f.value
+                          current.fontFamily === f.value
                             ? "border-primary bg-dark text-white"
                             : "border-border bg-surface text-primary hover:border-muted"
                         }`}
@@ -292,7 +371,7 @@ export default function CustomDesignerPage() {
                 {/* Font Size — slider */}
                 <div>
                   <label className="block text-sm font-semibold mb-3">
-                    Text Size <span className="text-muted font-normal">({textSizeNum}px)</span>
+                    Text Size <span className="text-muted font-normal">({current.fontSize}px)</span>
                   </label>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-muted w-6 text-right">{FONT_SIZE_MIN}</span>
@@ -300,8 +379,8 @@ export default function CustomDesignerPage() {
                       type="range"
                       min={FONT_SIZE_MIN}
                       max={FONT_SIZE_MAX}
-                      value={textSizeNum}
-                      onChange={(e) => setTextSizeNum(Number(e.target.value))}
+                      value={current.fontSize}
+                      onChange={(e) => setCurrent((prev) => ({ ...prev, fontSize: Number(e.target.value) }))}
                       className="flex-1 accent-dark cursor-pointer"
                     />
                     <span className="text-xs text-muted w-6">{FONT_SIZE_MAX}</span>

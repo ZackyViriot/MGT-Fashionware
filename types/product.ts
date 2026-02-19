@@ -4,7 +4,20 @@ export interface ColorVariant {
   image: string;
 }
 
+export interface SideDesign {
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  imageData?: string;
+  imagePos?: { x: number; y: number; scale: number };
+  textPos?: { x: number; y: number; scale: number };
+}
+
 export interface ProductDesign {
+  front?: SideDesign;
+  back?: SideDesign;
+  // Legacy flat fields kept for backward compat reads
   text?: string;
   textColor?: string;
   fontSize?: number;

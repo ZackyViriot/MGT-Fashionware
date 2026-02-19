@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/utils/cart-context";
+import { normalizeCustomDesign, sideHasContent } from "@/utils/design-helpers";
 import ShirtPreview from "@/components/ShirtPreview";
 
 export default function CartPage() {
@@ -41,20 +42,24 @@ export default function CartPage() {
           <div className="space-y-0 divide-y divide-border">
             {items.map((item) => {
               const key = `${item.productId}-${item.color}-${item.size}`;
+              const nd = item.isCustom && item.customDesign ? normalizeCustomDesign(item.customDesign) : null;
+              const frontSide = nd?.front;
+              const hasBackDesign = nd ? sideHasContent(nd.back) : false;
               return (
                 <div key={key} className="flex gap-4 py-6 first:pt-0">
                   {/* Image */}
-                  {item.isCustom && item.customDesign ? (
+                  {item.isCustom && nd ? (
                     <div className="shrink-0 w-24 h-24 md:w-28 md:h-28 rounded-lg overflow-hidden bg-surface flex items-center justify-center">
                       <ShirtPreview
-                        shirtColor={item.customDesign.shirtColor}
-                        text={item.customDesign.text}
-                        textColor={item.customDesign.textColor}
-                        fontFamily={item.customDesign.fontFamily}
-                        fontSize={item.customDesign.fontSize ?? 24}
-                        imageData={item.customDesign.imageData}
-                        imagePos={item.customDesign.imagePos}
-                        textPos={item.customDesign.textPos}
+                        shirtColor={nd.shirtColor}
+                        text={frontSide?.text}
+                        textColor={frontSide?.textColor}
+                        fontFamily={frontSide?.fontFamily}
+                        fontSize={frontSide?.fontSize ?? 24}
+                        imageData={frontSide?.imageData}
+                        imagePos={frontSide?.imagePos}
+                        textPos={frontSide?.textPos}
+                        side="front"
                         className="w-20 h-20 md:w-24 md:h-24"
                       />
                     </div>
@@ -92,6 +97,7 @@ export default function CartPage() {
                     )}
                     <p className="text-xs text-muted mt-1">
                       {item.color} / {item.size}
+                      {hasBackDesign && " · Front & Back"}
                     </p>
                     <p className="text-sm font-semibold text-primary mt-2">
                       ${item.price.toFixed(2)}

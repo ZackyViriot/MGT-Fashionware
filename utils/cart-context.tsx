@@ -8,8 +8,21 @@ export interface ElementPosition {
   scale: number;
 }
 
+export interface CustomDesignSide {
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  imageData?: string;
+  imagePos?: ElementPosition;
+  textPos?: ElementPosition;
+}
+
 export interface CustomDesign {
   shirtColor: string;
+  front?: CustomDesignSide;
+  back?: CustomDesignSide;
+  // Legacy flat fields kept for backward compat reads
   text?: string;
   textColor?: string;
   fontSize?: number;

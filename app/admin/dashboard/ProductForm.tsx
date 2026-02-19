@@ -8,6 +8,8 @@ import type { ElementPosition } from "@/utils/cart-context";
 import { SHIRT_COLORS } from "@/constants/shirt-colors";
 import { LIGHT_SHIRT_VALUES } from "@/constants/shirt-colors";
 import { FONT_GROUPS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT, getTextColors } from "@/constants/design-config";
+import { normalizeDesign } from "@/utils/design-helpers";
+import type { ShirtSide } from "@/constants/shirt-config";
 import ShirtEditor from "@/components/ShirtEditor";
 
 const MEN_SIZES = ["S", "M", "L", "XL", "XXL"];
@@ -35,6 +37,47 @@ interface ProductFormProps {
   editProduct?: Product | null;
   onCancel?: () => void;
   onSuccess?: () => void;
+}
+
+interface SideState {
+  text: string;
+  textColor: string;
+  fontSize: number;
+  fontFamily: string;
+  imageData: string;
+  imageName: string;
+  imagePos: ElementPosition;
+  textPos: ElementPosition;
+  fontGroupIdx: number;
+}
+
+function defaultSideState(): SideState {
+  return {
+    text: "",
+    textColor: "#ffffff",
+    fontSize: FONT_SIZE_DEFAULT,
+    fontFamily: FONT_GROUPS[0].fonts[0].value,
+    imageData: "",
+    imageName: "",
+    imagePos: DEFAULT_IMAGE_POS,
+    textPos: DEFAULT_TEXT_POS,
+    fontGroupIdx: 0,
+  };
+}
+
+function sideStateFromDesign(d: { text?: string; textColor?: string; fontSize?: number; fontFamily?: string; imageData?: string; imagePos?: { x: number; y: number; scale: number }; textPos?: { x: number; y: number; scale: number } } | undefined): SideState {
+  if (!d) return defaultSideState();
+  return {
+    text: d.text ?? "",
+    textColor: d.textColor ?? "#ffffff",
+    fontSize: d.fontSize ?? FONT_SIZE_DEFAULT,
+    fontFamily: d.fontFamily ?? FONT_GROUPS[0].fonts[0].value,
+    imageData: d.imageData ?? "",
+    imageName: "",
+    imagePos: d.imagePos ?? DEFAULT_IMAGE_POS,
+    textPos: d.textPos ?? DEFAULT_TEXT_POS,
+    fontGroupIdx: 0,
+  };
 }
 
 export default function ProductForm({ editProduct, onCancel, onSuccess }: ProductFormProps = {}) {
@@ -74,22 +117,20 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     return {};
   });
 
-  // Custom design state
+  // Custom design state — per-side
   const [customDesignEnabled, setCustomDesignEnabled] = useState(!!editProduct?.custom_design);
-  const existingDesign = editProduct?.custom_design;
-  const [designText, setDesignText] = useState(existingDesign?.text ?? "");
-  const [designTextColor, setDesignTextColor] = useState(existingDesign?.textColor ?? "#ffffff");
-  const [designFontFamily, setDesignFontFamily] = useState(existingDesign?.fontFamily ?? FONT_GROUPS[0].fonts[0].value);
-  const [designFontSize, setDesignFontSize] = useState(existingDesign?.fontSize ?? FONT_SIZE_DEFAULT);
-  const [designImageData, setDesignImageData] = useState(existingDesign?.imageData ?? "");
-  const [designImageName, setDesignImageName] = useState("");
-  const [designImagePos, setDesignImagePos] = useState<ElementPosition>(
-    existingDesign?.imagePos ?? DEFAULT_IMAGE_POS
+  const [activeSide, setActiveSide] = useState<ShirtSide>("front");
+
+  const normalizedEdit = editProduct?.custom_design ? normalizeDesign(editProduct.custom_design) : null;
+  const [frontDesign, setFrontDesign] = useState<SideState>(() =>
+    normalizedEdit ? sideStateFromDesign(normalizedEdit.front) : defaultSideState()
   );
-  const [designTextPos, setDesignTextPos] = useState<ElementPosition>(
-    existingDesign?.textPos ?? DEFAULT_TEXT_POS
+  const [backDesign, setBackDesign] = useState<SideState>(() =>
+    normalizedEdit ? sideStateFromDesign(normalizedEdit.back) : defaultSideState()
   );
-  const [fontGroupIdx, setFontGroupIdx] = useState(0);
+
+  const currentDesign = activeSide === "front" ? frontDesign : backDesign;
+  const setCurrentDesign = activeSide === "front" ? setFrontDesign : setBackDesign;
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -104,11 +145,11 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   // For the shirt editor preview, use the first selected color or default to black
   const previewShirtColor = selectedColors[0] ?? "#0a0a0a";
   const currentTextColors = getTextColors(previewShirtColor);
-  const hasDesignText = designText.trim().length > 0;
-  const hasDesignImage = designImageData.length > 0;
+  const hasDesignText = currentDesign.text.trim().length > 0;
+  const hasDesignImage = currentDesign.imageData.length > 0;
 
   const effectiveTextPos = hasDesignText
-    ? designTextPos
+    ? currentDesign.textPos
     : hasDesignImage
       ? DEFAULT_TEXT_POS
       : DEFAULT_TEXT_ONLY_POS;
@@ -153,11 +194,20 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   }, []);
 
   function handleShirtColorChange(hex: string) {
-    // When changing preview color, update text color if it's invalid for new shirt
     const newOptions = getTextColors(hex);
-    if (!newOptions.find((c) => c.value === designTextColor)) {
-      setDesignTextColor(newOptions[0].value);
-    }
+    // Validate text colors on both sides
+    setFrontDesign((prev) => {
+      if (!newOptions.find((c) => c.value === prev.textColor)) {
+        return { ...prev, textColor: newOptions[0].value };
+      }
+      return prev;
+    });
+    setBackDesign((prev) => {
+      if (!newOptions.find((c) => c.value === prev.textColor)) {
+        return { ...prev, textColor: newOptions[0].value };
+      }
+      return prev;
+    });
   }
 
   function handleDesignImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -179,19 +229,25 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, width, height);
       const compressed = canvas.toDataURL("image/jpeg", 0.8);
-      setDesignImageData(compressed);
-      setDesignImageName(file.name);
-      setDesignImagePos(DEFAULT_IMAGE_POS);
-      if (!hasDesignText) setDesignTextPos(DEFAULT_TEXT_POS);
+      setCurrentDesign((prev) => ({
+        ...prev,
+        imageData: compressed,
+        imageName: file.name,
+        imagePos: DEFAULT_IMAGE_POS,
+        textPos: prev.text.trim() ? prev.textPos : DEFAULT_TEXT_POS,
+      }));
       URL.revokeObjectURL(img.src);
     };
     img.src = URL.createObjectURL(file);
   }
 
   function clearDesignImage() {
-    setDesignImageData("");
-    setDesignImageName("");
-    setDesignImagePos(DEFAULT_IMAGE_POS);
+    setCurrentDesign((prev) => ({
+      ...prev,
+      imageData: "",
+      imageName: "",
+      imagePos: DEFAULT_IMAGE_POS,
+    }));
     if (designFileRef.current) designFileRef.current.value = "";
   }
 
@@ -211,8 +267,11 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
     const allImageUrls: string[] = [];
 
     if (customDesignEnabled) {
-      // Validate design has content
-      if (!hasDesignText && !hasDesignImage) {
+      // Validate design has content on at least one side
+      const fHasContent = frontDesign.text.trim().length > 0 || frontDesign.imageData.length > 0;
+      const bHasContent = backDesign.text.trim().length > 0 || backDesign.imageData.length > 0;
+
+      if (!fHasContent && !bHasContent) {
         setMessage({ type: "error", text: "Add text or an image to the custom design." });
         setLoading(false);
         return;
@@ -274,18 +333,35 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
 
     const gender = genderSelections.join(",") || null;
 
-    // Build custom_design JSON if enabled
-    const custom_design: ProductDesign | null = customDesignEnabled
-      ? {
-          text: hasDesignText ? designText : undefined,
-          textColor: hasDesignText ? designTextColor : undefined,
-          fontSize: hasDesignText ? designFontSize : undefined,
-          fontFamily: hasDesignText ? designFontFamily : undefined,
-          imageData: hasDesignImage ? designImageData : undefined,
-          imagePos: hasDesignImage ? designImagePos : undefined,
-          textPos: hasDesignText ? designTextPos : undefined,
-        }
-      : null;
+    // Build custom_design JSON if enabled — always use { front, back } format
+    let custom_design: ProductDesign | null = null;
+    if (customDesignEnabled) {
+      const fHasText = frontDesign.text.trim().length > 0;
+      const fHasImage = frontDesign.imageData.length > 0;
+      const bHasText = backDesign.text.trim().length > 0;
+      const bHasImage = backDesign.imageData.length > 0;
+
+      custom_design = {
+        front: (fHasText || fHasImage) ? {
+          text: fHasText ? frontDesign.text : undefined,
+          textColor: fHasText ? frontDesign.textColor : undefined,
+          fontSize: fHasText ? frontDesign.fontSize : undefined,
+          fontFamily: fHasText ? frontDesign.fontFamily : undefined,
+          imageData: fHasImage ? frontDesign.imageData : undefined,
+          imagePos: fHasImage ? frontDesign.imagePos : undefined,
+          textPos: fHasText ? frontDesign.textPos : undefined,
+        } : undefined,
+        back: (bHasText || bHasImage) ? {
+          text: bHasText ? backDesign.text : undefined,
+          textColor: bHasText ? backDesign.textColor : undefined,
+          fontSize: bHasText ? backDesign.fontSize : undefined,
+          fontFamily: bHasText ? backDesign.fontFamily : undefined,
+          imageData: bHasImage ? backDesign.imageData : undefined,
+          imagePos: bHasImage ? backDesign.imagePos : undefined,
+          textPos: bHasText ? backDesign.textPos : undefined,
+        } : undefined,
+      };
+    }
 
     const productData = {
       name,
@@ -348,14 +424,9 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       setSelectedColors([]);
       setColorImages({});
       setCustomDesignEnabled(false);
-      setDesignText("");
-      setDesignTextColor("#ffffff");
-      setDesignFontFamily(FONT_GROUPS[0].fonts[0].value);
-      setDesignFontSize(FONT_SIZE_DEFAULT);
-      setDesignImageData("");
-      setDesignImageName("");
-      setDesignImagePos(DEFAULT_IMAGE_POS);
-      setDesignTextPos(DEFAULT_TEXT_POS);
+      setActiveSide("front");
+      setFrontDesign(defaultSideState());
+      setBackDesign(defaultSideState());
       setLoading(false);
       router.refresh();
     }
@@ -559,19 +630,38 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       {/* Custom Design Section */}
       {customDesignEnabled && selectedColors.length > 0 && (
         <div className="border border-border rounded-2xl p-5 space-y-5 bg-bg/50">
+          {/* Front / Back toggle */}
+          <div className="flex justify-center gap-1">
+            {(["front", "back"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActiveSide(s)}
+                className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                  activeSide === s
+                    ? "bg-dark text-white"
+                    : "bg-card text-muted hover:text-primary border border-border"
+                }`}
+              >
+                {s === "front" ? "Front" : "Back"}
+              </button>
+            ))}
+          </div>
+
           {/* Shirt Editor Preview */}
           <div className="flex justify-center bg-surface rounded-xl p-6">
             <ShirtEditor
               shirtColor={previewShirtColor}
-              text={designText || undefined}
-              textColor={designTextColor}
-              fontFamily={designFontFamily}
-              fontSize={designFontSize}
-              imageData={designImageData || undefined}
-              imagePos={designImagePos}
+              text={currentDesign.text || undefined}
+              textColor={currentDesign.textColor}
+              fontFamily={currentDesign.fontFamily}
+              fontSize={currentDesign.fontSize}
+              imageData={currentDesign.imageData || undefined}
+              imagePos={currentDesign.imagePos}
               textPos={effectiveTextPos}
-              onImagePosChange={setDesignImagePos}
-              onTextPosChange={setDesignTextPos}
+              onImagePosChange={(pos) => setCurrentDesign((prev) => ({ ...prev, imagePos: pos }))}
+              onTextPosChange={(pos) => setCurrentDesign((prev) => ({ ...prev, textPos: pos }))}
+              side={activeSide}
               className="w-full max-w-[240px]"
             />
           </div>
@@ -611,16 +701,16 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
           {/* Design Image Upload */}
           <div>
             <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
-              Design Image
+              Design Image ({activeSide})
             </label>
-            {designImageData ? (
+            {currentDesign.imageData ? (
               <div className="flex items-center gap-3 bg-card rounded-lg px-4 py-3 border border-border">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-muted shrink-0">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <path d="M21 15l-5-5L5 21" />
                 </svg>
-                <span className="text-sm text-primary truncate flex-1">{designImageName || "Uploaded image"}</span>
+                <span className="text-sm text-primary truncate flex-1">{currentDesign.imageName || "Uploaded image"}</span>
                 <button
                   type="button"
                   onClick={clearDesignImage}
@@ -659,17 +749,17 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
           {/* Design Text */}
           <div>
             <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
-              Design Text
+              Design Text ({activeSide})
             </label>
             <input
               type="text"
-              value={designText}
-              onChange={(e) => setDesignText(e.target.value)}
+              value={currentDesign.text}
+              onChange={(e) => setCurrentDesign((prev) => ({ ...prev, text: e.target.value }))}
               placeholder="Enter text for the shirt..."
               maxLength={14}
               className={inputClass}
             />
-            <p className="text-xs text-muted mt-1">{designText.length}/14 characters</p>
+            <p className="text-xs text-muted mt-1">{currentDesign.text.length}/14 characters</p>
           </div>
 
           {/* Text styling (visible when text entered) */}
@@ -685,10 +775,10 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     <button
                       key={c.value}
                       type="button"
-                      onClick={() => setDesignTextColor(c.value)}
+                      onClick={() => setCurrentDesign((prev) => ({ ...prev, textColor: c.value }))}
                       title={c.name}
                       className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
-                        designTextColor === c.value
+                        currentDesign.textColor === c.value
                           ? "border-primary scale-110 ring-2 ring-primary/20"
                           : "border-border hover:border-muted"
                       }`}
@@ -697,7 +787,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                   ))}
                 </div>
                 <p className="text-xs text-muted mt-2">
-                  {currentTextColors.find((c) => c.value === designTextColor)?.name}
+                  {currentTextColors.find((c) => c.value === currentDesign.textColor)?.name}
                 </p>
               </div>
 
@@ -711,9 +801,9 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     <button
                       key={g.label}
                       type="button"
-                      onClick={() => setFontGroupIdx(i)}
+                      onClick={() => setCurrentDesign((prev) => ({ ...prev, fontGroupIdx: i }))}
                       className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-200 cursor-pointer ${
-                        fontGroupIdx === i
+                        currentDesign.fontGroupIdx === i
                           ? "bg-dark text-white"
                           : "bg-card text-muted hover:text-primary border border-border"
                       }`}
@@ -723,13 +813,13 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {FONT_GROUPS[fontGroupIdx].fonts.map((f) => (
+                  {FONT_GROUPS[currentDesign.fontGroupIdx].fonts.map((f) => (
                     <button
                       key={f.value}
                       type="button"
-                      onClick={() => setDesignFontFamily(f.value)}
+                      onClick={() => setCurrentDesign((prev) => ({ ...prev, fontFamily: f.value }))}
                       className={`px-3 py-2 rounded-lg border text-sm truncate transition-all duration-200 cursor-pointer ${
-                        designFontFamily === f.value
+                        currentDesign.fontFamily === f.value
                           ? "border-primary bg-dark text-white"
                           : "border-border bg-card text-primary hover:border-muted"
                       }`}
@@ -744,7 +834,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
               {/* Font Size */}
               <div>
                 <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
-                  Text Size <span className="text-muted font-normal">({designFontSize}px)</span>
+                  Text Size <span className="text-muted font-normal">({currentDesign.fontSize}px)</span>
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted w-6 text-right">{FONT_SIZE_MIN}</span>
@@ -752,8 +842,8 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     type="range"
                     min={FONT_SIZE_MIN}
                     max={FONT_SIZE_MAX}
-                    value={designFontSize}
-                    onChange={(e) => setDesignFontSize(Number(e.target.value))}
+                    value={currentDesign.fontSize}
+                    onChange={(e) => setCurrentDesign((prev) => ({ ...prev, fontSize: Number(e.target.value) }))}
                     className="flex-1 accent-dark cursor-pointer"
                   />
                   <span className="text-xs text-muted w-6">{FONT_SIZE_MAX}</span>

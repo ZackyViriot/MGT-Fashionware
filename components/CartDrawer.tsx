@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useCart } from "@/utils/cart-context";
+import { normalizeCustomDesign, sideHasContent } from "@/utils/design-helpers";
 import ShirtPreview from "./ShirtPreview";
 
 interface CartDrawerProps {
@@ -84,20 +85,24 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-0 divide-y divide-border">
               {items.map((item) => {
                 const key = `${item.productId}-${item.color}-${item.size}`;
+                const nd = item.isCustom && item.customDesign ? normalizeCustomDesign(item.customDesign) : null;
+                const frontSide = nd?.front;
+                const hasBackDesign = nd ? sideHasContent(nd.back) : false;
                 return (
                   <div key={key} className="flex gap-3 py-4 first:pt-0">
                     {/* Thumbnail */}
-                    {item.isCustom && item.customDesign ? (
+                    {item.isCustom && nd ? (
                       <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-surface flex items-center justify-center">
                         <ShirtPreview
-                          shirtColor={item.customDesign.shirtColor}
-                          text={item.customDesign.text}
-                          textColor={item.customDesign.textColor}
-                          fontFamily={item.customDesign.fontFamily}
-                          fontSize={item.customDesign.fontSize ?? 24}
-                          imageData={item.customDesign.imageData}
-                          imagePos={item.customDesign.imagePos}
-                          textPos={item.customDesign.textPos}
+                          shirtColor={nd.shirtColor}
+                          text={frontSide?.text}
+                          textColor={frontSide?.textColor}
+                          fontFamily={frontSide?.fontFamily}
+                          fontSize={frontSide?.fontSize ?? 24}
+                          imageData={frontSide?.imageData}
+                          imagePos={frontSide?.imagePos}
+                          textPos={frontSide?.textPos}
+                          side="front"
                           className="w-16 h-16"
                         />
                       </div>
@@ -136,6 +141,7 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                       )}
                       <p className="text-[11px] text-muted mt-0.5">
                         {item.color} / {item.size}
+                        {hasBackDesign && " · Front & Back"}
                       </p>
                       <p className="text-[13px] font-semibold text-primary mt-1">
                         ${item.price.toFixed(2)}

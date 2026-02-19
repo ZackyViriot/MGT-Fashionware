@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 960" width="800" height="960">
+  <defs>
+    <linearGradient id="fabricShadeB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#f8f8f8" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#f0f0f0" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="leftShadowB" x1="0" y1="0" x2="0.15" y2="0">
+      <stop offset="0%" stop-color="#e8e8e8"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rightShadowB" x1="0.85" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e8e8e8"/>
+    </linearGradient>
+    <radialGradient id="armpitShadowLB" cx="0.9" cy="0.3" r="0.4">
+      <stop offset="0%" stop-color="#e5e5e5" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="armpitShadowRB" cx="0.1" cy="0.3" r="0.4">
+      <stop offset="0%" stop-color="#e5e5e5" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Back yoke seam shadow -->
+    <linearGradient id="yokeShadow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0e0e0" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Main shirt body — back has shallower neckline -->
+  <path d="
+    M240 120
+    L160 152
+    L40 240
+    L120 320
+    L160 288
+    L160 840
+    C160 872 184 896 216 896
+    L584 896
+    C616 896 640 872 640 840
+    L640 288
+    L680 320
+    L760 240
+    L640 152
+    L560 120
+    C552 144 504 160 400 160
+    C296 160 248 144 240 120
+    Z
+  " fill="url(#fabricShadeB)"/>
+
+  <!-- Left side shadow -->
+  <path d="
+    M240 120 L160 152 L40 240 L120 320 L160 288 L160 840 C160 872 184 896 216 896
+    L280 896 L280 288 L200 320 L160 280 L160 152 L240 120 Z
+  " fill="url(#leftShadowB)" opacity="0.4"/>
+
+  <!-- Right side shadow -->
+  <path d="
+    M560 120 L640 152 L760 240 L680 320 L640 288 L640 840 C640 872 616 896 584 896
+    L520 896 L520 288 L600 320 L640 280 L640 152 L560 120 Z
+  " fill="url(#rightShadowB)" opacity="0.4"/>
+
+  <!-- Back neckline (shallower) -->
+  <path d="M240 120 C248 144 296 160 400 160 C504 160 552 144 560 120"
+    fill="none" stroke="#e0e0e0" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Collar ribbing -->
+  <path d="M240 120 C248 144 296 160 400 160 C504 160 552 144 560 120"
+    fill="none" stroke="#d8d8d8" stroke-width="8" stroke-linecap="round" opacity="0.3"/>
+  <path d="M244 118 C252 140 298 154 400 154 C502 154 548 140 556 118"
+    fill="none" stroke="#f0f0f0" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Sleeve seam lines -->
+  <path d="M160 288 L160 152" fill="none" stroke="#ebebeb" stroke-width="2" opacity="0.5"/>
+  <path d="M640 288 L640 152" fill="none" stroke="#ebebeb" stroke-width="2" opacity="0.5"/>
+
+  <!-- Armpit shadows -->
+  <rect x="160" y="220" width="120" height="120" fill="url(#armpitShadowLB)" opacity="0.3"/>
+  <rect x="520" y="220" width="120" height="120" fill="url(#armpitShadowRB)" opacity="0.3"/>
+
+  <!-- Back yoke seam (horizontal line across upper back) -->
+  <line x1="180" y1="280" x2="620" y2="280" stroke="#e8e8e8" stroke-width="2" opacity="0.4"/>
+  <rect x="160" y="280" width="480" height="30" fill="url(#yokeShadow)" opacity="0.2"/>
+
+  <!-- Center back seam hint -->
+  <line x1="400" y1="170" x2="400" y2="880" stroke="#eeeeee" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Bottom hem shadow -->
+  <rect x="160" y="870" width="480" height="26" rx="13" fill="#e8e8e8" opacity="0.25"/>
+</svg>

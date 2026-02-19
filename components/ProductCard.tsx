@@ -4,13 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@/types/product";
+import { normalizeDesign, sideHasContent } from "@/utils/design-helpers";
 import ShirtPreview from "./ShirtPreview";
 
 export default function ProductCard({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
   const fallbackImage = product.images?.[0];
   const [activeIndex, setActiveIndex] = useState(0);
-  const design = product.custom_design;
+  const normalized = normalizeDesign(product.custom_design);
+  const design = normalized.front;
+  const hasBack = sideHasContent(normalized.back);
 
   const displayImage = variants.length > 0
     ? variants[activeIndex]?.image
@@ -33,8 +36,14 @@ export default function ProductCard({ product }: { product: Product }) {
                 imageData={design.imageData}
                 imagePos={design.imagePos}
                 textPos={design.textPos}
+                side="front"
                 className="w-full h-full"
               />
+              {hasBack && (
+                <span className="absolute top-2 right-2 bg-dark/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+                  Front &amp; Back
+                </span>
+              )}
             </div>
           ) : displayImage ? (
             <Image

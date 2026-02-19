@@ -5,16 +5,21 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/utils/cart-context";
 import type { Product } from "@/types/product";
+import { normalizeDesign, sideHasContent } from "@/utils/design-helpers";
+import type { ShirtSide } from "@/constants/shirt-config";
 import ShirtPreview from "./ShirtPreview";
 
 export default function ProductDetail({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
   const hasVariants = variants.length > 0;
-  const design = product.custom_design;
+  const normalized = normalizeDesign(product.custom_design);
+  const hasDesign = !!(normalized.front || normalized.back);
+  const hasBack = sideHasContent(normalized.back);
 
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  const [viewSide, setViewSide] = useState<ShirtSide>("front");
   const { addItem } = useCart();
 
   const displayImage = hasVariants
@@ -26,6 +31,7 @@ export default function ProductDetail({ product }: { product: Product }) {
     : product.images ?? [];
 
   const activeShirtColor = variants[selectedColor]?.hex ?? "#0a0a0a";
+  const activeSideDesign = viewSide === "front" ? normalized.front : normalized.back;
 
   function handleAddToCart() {
     if (!selectedSize) return;
@@ -77,17 +83,35 @@ export default function ProductDetail({ product }: { product: Product }) {
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           {/* Images / Shirt Preview */}
           <div className="space-y-3">
-            {design ? (
-              <div className="overflow-hidden rounded-2xl bg-surface flex items-center justify-center p-8">
+            {hasDesign ? (
+              <div className="overflow-hidden rounded-2xl bg-surface flex flex-col items-center justify-center p-8">
+                {hasBack && (
+                  <div className="flex justify-center gap-1 mb-4">
+                    {(["front", "back"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setViewSide(s)}
+                        className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                          viewSide === s
+                            ? "bg-dark text-white"
+                            : "bg-bg text-muted hover:text-primary border border-border"
+                        }`}
+                      >
+                        {s === "front" ? "Front" : "Back"}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <ShirtPreview
                   shirtColor={activeShirtColor}
-                  text={design.text}
-                  textColor={design.textColor}
-                  fontFamily={design.fontFamily}
-                  fontSize={design.fontSize}
-                  imageData={design.imageData}
-                  imagePos={design.imagePos}
-                  textPos={design.textPos}
+                  text={activeSideDesign?.text}
+                  textColor={activeSideDesign?.textColor}
+                  fontFamily={activeSideDesign?.fontFamily}
+                  fontSize={activeSideDesign?.fontSize}
+                  imageData={activeSideDesign?.imageData}
+                  imagePos={activeSideDesign?.imagePos}
+                  textPos={activeSideDesign?.textPos}
+                  side={viewSide}
                   className="w-full max-w-md"
                 />
               </div>
