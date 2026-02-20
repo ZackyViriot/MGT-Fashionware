@@ -4,7 +4,8 @@
 import { useRef, useState, useEffect } from "react";
 import { Stage, Layer, Image as KImage, Text as KText, Group } from "react-konva";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
-import { SHIRT_CONFIG, LOGICAL_WIDTH, LOGICAL_HEIGHT, type ShirtSide } from "@/constants/shirt-config";
+import { type ShirtSide } from "@/constants/shirt-config";
+import { type GarmentType, GARMENT_CONFIGS } from "@/constants/garment-types";
 import { useShirtImage } from "@/hooks/use-shirt-image";
 import { useContainerSize } from "@/hooks/use-container-size";
 
@@ -22,6 +23,7 @@ interface Props {
   imageData?: string;
   imagePos: ElementPosition;
   side?: ShirtSide;
+  garmentType?: GarmentType;
 }
 
 const IMAGE_BASE = 90;
@@ -37,13 +39,17 @@ export default function ShirtPreviewCanvas({
   imageData,
   imagePos,
   side = "front",
+  garmentType = "shirt",
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { width, height } = useContainerSize(containerRef);
-  const scaleX = width / LOGICAL_WIDTH;
-  const scaleY = height / LOGICAL_HEIGHT;
+  const config = GARMENT_CONFIGS[garmentType];
+  const { logicalWidth, logicalHeight } = config;
 
-  const { image: shirtImage } = useShirtImage(side, shirtColor);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { width, height } = useContainerSize(containerRef, logicalHeight / logicalWidth);
+  const scaleX = width / logicalWidth;
+  const scaleY = height / logicalHeight;
+
+  const { image: shirtImage } = useShirtImage(side, shirtColor, garmentType);
   const [designImage, setDesignImage] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -52,11 +58,12 @@ export default function ShirtPreviewCanvas({
       return;
     }
     const img = new window.Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => setDesignImage(img);
     img.src = imageData;
   }, [imageData]);
 
-  const printArea = SHIRT_CONFIG[side].printArea;
+  const printArea = config.sideConfigs[side].printArea;
 
   const imgW = IMAGE_BASE * imagePos.scale;
   const imgH = IMAGE_BASE * imagePos.scale;
@@ -76,7 +83,7 @@ export default function ShirtPreviewCanvas({
       : [];
 
   return (
-    <div ref={containerRef} style={{ width: "100%", aspectRatio: `${LOGICAL_WIDTH}/${LOGICAL_HEIGHT}` }}>
+    <div ref={containerRef} style={{ width: "100%", aspectRatio: `${logicalWidth}/${logicalHeight}` }}>
       {width > 0 && (
         <Stage
           width={width}
@@ -91,8 +98,8 @@ export default function ShirtPreviewCanvas({
                 image={shirtImage}
                 x={0}
                 y={0}
-                width={LOGICAL_WIDTH}
-                height={LOGICAL_HEIGHT}
+                width={logicalWidth}
+                height={logicalHeight}
               />
             )}
 

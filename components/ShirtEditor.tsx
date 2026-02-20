@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import type { ShirtSide } from "@/constants/shirt-config";
+import type { GarmentType } from "@/constants/garment-types";
 
 export type { ElementPosition, TextItem };
 
@@ -24,13 +25,14 @@ interface ShirtEditorProps {
   onSelect: (type: "image" | "text", id?: string) => void;
   onDeselect: () => void;
   side?: ShirtSide;
+  garmentType?: GarmentType;
   className?: string;
 }
 
-export default function ShirtEditor({ className = "", ...props }: ShirtEditorProps) {
+export default function ShirtEditor({ className = "", garmentType = "shirt", ...props }: ShirtEditorProps) {
   return (
     <div className={className}>
-      <ShirtEditorCanvas {...props} />
+      <ShirtEditorCanvas {...props} garmentType={garmentType} />
     </div>
   );
 }

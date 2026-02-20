@@ -9,7 +9,7 @@ import { SHIRT_COLORS } from "@/constants/shirt-colors";
 import { LIGHT_SHIRT_VALUES } from "@/constants/shirt-colors";
 import { FONT_GROUPS, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_DEFAULT, getTextColors } from "@/constants/design-config";
 import { normalizeDesign } from "@/utils/design-helpers";
-import type { ShirtSide } from "@/constants/shirt-config";
+import { GARMENT_CONFIGS, GARMENT_TYPES, type GarmentType, type GarmentSide } from "@/constants/garment-types";
 import ShirtEditor from "@/components/ShirtEditor";
 
 const MEN_SIZES = ["S", "M", "L", "XL", "XXL"];
@@ -111,7 +111,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   const [name, setName] = useState(editProduct?.name ?? "");
   const [description, setDescription] = useState(editProduct?.description ?? "");
   const [price, setPrice] = useState(editProduct ? String(editProduct.price) : "");
-  const [category, setCategory] = useState(editProduct?.category ?? "");
+  const [category, setCategory] = useState(editProduct?.garment_type ?? editProduct?.category ?? "");
   const [genderSelections, setGenderSelections] = useState<string[]>(
     editProduct?.gender ? editProduct.gender.split(",") : []
   );
@@ -141,7 +141,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   });
 
   const [customDesignEnabled, setCustomDesignEnabled] = useState(!!editProduct?.custom_design);
-  const [activeSide, setActiveSide] = useState<ShirtSide>("front");
+  const [activeSide, setActiveSide] = useState<GarmentSide>("front");
 
   const normalizedEdit = editProduct?.custom_design ? normalizeDesign(editProduct.custom_design) : null;
   const [frontDesign, setFrontDesign] = useState<SideState>(() =>
@@ -162,6 +162,10 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
   const designFileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  const selectedGarmentConfig = (category && category in GARMENT_CONFIGS)
+    ? GARMENT_CONFIGS[category as GarmentType]
+    : null;
 
   const availableSizes = getSizesForGenders(genderSelections);
   const previewShirtColor = selectedColors[0] ?? "#0a0a0a";
@@ -412,6 +416,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
       images: allImageUrls,
       color_variants: colorVariants,
       category: category || null,
+      garment_type: (category && category in GARMENT_CONFIGS) ? category : null,
       gender,
       sizes,
       custom_design,
@@ -529,13 +534,18 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
         <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-primary mb-2">
           Category
         </label>
-        <input
-          type="text"
+        <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="e.g. Tops, Bottoms, Outerwear"
           className={inputClass}
-        />
+        >
+          <option value="">None (Regular Product)</option>
+          {GARMENT_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {GARMENT_CONFIGS[type].label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
@@ -676,11 +686,11 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
         <div className="border border-border rounded-2xl p-5 space-y-5 bg-bg/50">
           {/* Front / Back toggle */}
           <div className="flex justify-center gap-1">
-            {(["front", "back"] as const).map((s) => (
+            {(selectedGarmentConfig?.sides ?? ["front", "back"]).map((s) => (
               <button
                 key={s}
                 type="button"
-                onClick={() => { setActiveSide(s); setSelectedTextId(null); }}
+                onClick={() => { setActiveSide(s); setSelectedTextId(null); if (designFileRef.current) designFileRef.current.value = ""; }}
                 className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
                   activeSide === s
                     ? "bg-dark text-white"
@@ -705,6 +715,7 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
               onSelect={handleSelect}
               onDeselect={handleDeselect}
               side={activeSide}
+              garmentType={(category && category in GARMENT_CONFIGS) ? category as GarmentType : "shirt"}
               className="w-full max-w-[240px]"
             />
           </div>

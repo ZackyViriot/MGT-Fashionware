@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { SHIRT_CONFIG, type ShirtSide } from "@/constants/shirt-config";
+import { type ShirtSide } from "@/constants/shirt-config";
+import { type GarmentType, GARMENT_CONFIGS } from "@/constants/garment-types";
 
 // Module-level caches
 const imageCache = new Map<string, HTMLImageElement>();
@@ -50,12 +51,12 @@ function evictOldest() {
   }
 }
 
-export function useShirtImage(side: ShirtSide, color: string) {
+export function useShirtImage(side: ShirtSide, color: string, garmentType: GarmentType = "shirt") {
   const [image, setImage] = useState<HTMLCanvasElement | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const key = `${side}::${color}`;
+    const key = `${garmentType}::${side}::${color}`;
     const cached = tintCache.get(key);
     if (cached) {
       setImage(cached);
@@ -66,7 +67,8 @@ export function useShirtImage(side: ShirtSide, color: string) {
     let cancelled = false;
     setLoading(true);
 
-    loadImage(SHIRT_CONFIG[side].imagePath)
+    const imagePath = GARMENT_CONFIGS[garmentType].sideConfigs[side].imagePath;
+    loadImage(imagePath)
       .then((img) => {
         if (cancelled) return;
         evictOldest();
@@ -82,7 +84,7 @@ export function useShirtImage(side: ShirtSide, color: string) {
     return () => {
       cancelled = true;
     };
-  }, [side, color]);
+  }, [side, color, garmentType]);
 
   return { image, loading };
 }

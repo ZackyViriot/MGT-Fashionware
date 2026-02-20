@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { uploadBase64Image } from "@/utils/upload-image";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -17,13 +18,13 @@ export async function POST(request: Request) {
     // Upload front image if present (base64 → storage)
     let frontImageUrl: string | null = null;
     if (front?.imageData) {
-      frontImageUrl = await uploadBase64Image(supabase, front.imageData, "front");
+      frontImageUrl = await uploadBase64Image(front.imageData, "front");
     }
 
     // Upload back image if present
     let backImageUrl: string | null = null;
     if (back?.imageData) {
-      backImageUrl = await uploadBase64Image(supabase, back.imageData, "back");
+      backImageUrl = await uploadBase64Image(back.imageData, "back");
     }
 
     // Build text items JSON (strip only what we need)
@@ -80,33 +81,3 @@ export async function POST(request: Request) {
   }
 }
 
-async function uploadBase64Image(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  base64Data: string,
-  label: string
-): Promise<string | null> {
-  try {
-    const matches = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
-    if (!matches) return null;
-
-    const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
-    const buffer = Buffer.from(matches[2], "base64");
-    const path = `${Date.now()}-${label}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const { error } = await supabase.storage
-      .from("custom-designs")
-      .upload(path, buffer, {
-        contentType: `image/${matches[1]}`,
-      });
-
-    if (error) {
-      console.error("Upload error:", error.message);
-      return null;
-    }
-
-    const { data } = supabase.storage.from("custom-designs").getPublicUrl(path);
-    return data.publicUrl;
-  } catch {
-    return null;
-  }
-}

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import type { ShirtSide } from "@/constants/shirt-config";
+import type { GarmentType } from "@/constants/garment-types";
 
 const ShirtPreviewCanvas = dynamic(() => import("./ShirtPreviewCanvas"), {
   ssr: false,
@@ -25,6 +26,7 @@ interface ShirtPreviewProps {
   imageData?: string;
   imagePos?: ElementPosition;
   side?: ShirtSide;
+  garmentType?: GarmentType;
   className?: string;
 }
 
@@ -34,6 +36,7 @@ export default function ShirtPreview({
   className = "",
   imagePos,
   imageData,
+  garmentType = "shirt",
   ...rest
 }: ShirtPreviewProps) {
   const ip = imagePos ?? DEFAULT_IMAGE_POS;
@@ -44,6 +47,7 @@ export default function ShirtPreview({
         {...rest}
         imageData={imageData}
         imagePos={ip}
+        garmentType={garmentType}
       />
     </div>
   );

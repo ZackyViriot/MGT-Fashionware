@@ -5,7 +5,8 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Stage, Layer, Image as KImage, Text as KText, Group, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
-import { SHIRT_CONFIG, LOGICAL_WIDTH, LOGICAL_HEIGHT, type ShirtSide } from "@/constants/shirt-config";
+import { type ShirtSide } from "@/constants/shirt-config";
+import { type GarmentType, GARMENT_CONFIGS } from "@/constants/garment-types";
 import { useShirtImage } from "@/hooks/use-shirt-image";
 import { useContainerSize } from "@/hooks/use-container-size";
 
@@ -20,6 +21,7 @@ interface Props {
   onSelect: (type: "image" | "text", id?: string) => void;
   onDeselect: () => void;
   side?: ShirtSide;
+  garmentType?: GarmentType;
 }
 
 const IMAGE_BASE = 90;
@@ -39,13 +41,17 @@ export default function ShirtEditorCanvas({
   onSelect,
   onDeselect,
   side = "front",
+  garmentType = "shirt",
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { width, height } = useContainerSize(containerRef);
-  const scaleX = width / LOGICAL_WIDTH;
-  const scaleY = height / LOGICAL_HEIGHT;
+  const config = GARMENT_CONFIGS[garmentType];
+  const { logicalWidth, logicalHeight } = config;
 
-  const { image: shirtImage } = useShirtImage(side, shirtColor);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { width, height } = useContainerSize(containerRef, logicalHeight / logicalWidth);
+  const scaleX = width / logicalWidth;
+  const scaleY = height / logicalHeight;
+
+  const { image: shirtImage } = useShirtImage(side, shirtColor, garmentType);
   const [designImage, setDesignImage] = useState<HTMLImageElement | null>(null);
   const [selected, setSelected] = useState<{ type: "image" | "text"; id?: string } | null>(null);
 
@@ -56,7 +62,7 @@ export default function ShirtEditorCanvas({
   const callbacksRef = useRef({ onImagePosChange, onTextItemPosChange });
   callbacksRef.current = { onImagePosChange, onTextItemPosChange };
 
-  const printArea = SHIRT_CONFIG[side].printArea;
+  const printArea = config.sideConfigs[side].printArea;
 
   const imgW = IMAGE_BASE * imagePos.scale;
   const imgH = IMAGE_BASE * imagePos.scale;
@@ -174,7 +180,7 @@ export default function ShirtEditorCanvas({
   const hasContent = imageData || textItems.length > 0;
 
   return (
-    <div ref={containerRef} style={{ width: "100%", aspectRatio: `${LOGICAL_WIDTH}/${LOGICAL_HEIGHT}` }}>
+    <div ref={containerRef} style={{ width: "100%", aspectRatio: `${logicalWidth}/${logicalHeight}` }}>
       {width > 0 && (
         <Stage
           width={width}
@@ -190,8 +196,8 @@ export default function ShirtEditorCanvas({
                 image={shirtImage}
                 x={0}
                 y={0}
-                width={LOGICAL_WIDTH * scaleX}
-                height={LOGICAL_HEIGHT * scaleY}
+                width={logicalWidth * scaleX}
+                height={logicalHeight * scaleY}
                 listening={false}
               />
             )}
@@ -281,7 +287,7 @@ export default function ShirtEditorCanvas({
               <KText
                 text="Click to select · Drag to move · Corners to resize"
                 x={0}
-                y={(LOGICAL_HEIGHT - 8) * scaleY}
+                y={(logicalHeight - 8) * scaleY}
                 width={width}
                 fontSize={6.5 * scaleX}
                 fontFamily="sans-serif"

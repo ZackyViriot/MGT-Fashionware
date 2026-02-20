@@ -1,5 +1,6 @@
 import type { ProductDesign, SideDesign } from "@/types/product";
 import type { CustomDesign } from "@/utils/cart-context";
+import type { GarmentType } from "@/constants/garment-types";
 
 export type { SideDesign };
 export type ShirtSide = "front" | "back";
@@ -32,17 +33,18 @@ export function normalizeDesign(d: ProductDesign | null | undefined): Normalized
   return hasContent ? { front: side } : {};
 }
 
-/** Convert a CustomDesign (cart context, possibly legacy) into { front, back } + shirtColor. */
+/** Convert a CustomDesign (cart context, possibly legacy) into { front, back } + shirtColor + garmentType. */
 export function normalizeCustomDesign(d: CustomDesign | undefined): {
   shirtColor: string;
   front?: SideDesign;
   back?: SideDesign;
+  garmentType: GarmentType;
 } {
-  if (!d) return { shirtColor: "#0a0a0a" };
+  if (!d) return { shirtColor: "#0a0a0a", garmentType: "shirt" as GarmentType };
 
   // New format
   if (d.front || d.back) {
-    return { shirtColor: d.shirtColor, front: d.front, back: d.back };
+    return { shirtColor: d.shirtColor, front: d.front, back: d.back, garmentType: d.garmentType ?? "shirt" as GarmentType };
   }
 
   // Legacy flat format
@@ -56,7 +58,7 @@ export function normalizeCustomDesign(d: CustomDesign | undefined): {
   if (d.textPos) side.textPos = d.textPos;
 
   const hasContent = side.text || side.imageData;
-  return { shirtColor: d.shirtColor, front: hasContent ? side : undefined };
+  return { shirtColor: d.shirtColor, front: hasContent ? side : undefined, garmentType: "shirt" as GarmentType };
 }
 
 /** Check if a side design has any content */

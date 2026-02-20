@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/utils/cart-context";
 import { normalizeCustomDesign, sideHasContent } from "@/utils/design-helpers";
+import { GARMENT_CONFIGS, isValidGarmentType } from "@/constants/garment-types";
 import ShirtPreview from "@/components/ShirtPreview";
 
 export default function CartPage() {
@@ -87,7 +88,7 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     {item.isCustom ? (
                       <h3 className="text-sm font-semibold text-primary leading-snug">
-                        Custom Shirt
+                        {`Custom ${isValidGarmentType(nd?.garmentType ?? "") ? GARMENT_CONFIGS[nd!.garmentType].label : "Shirt"}`}
                       </h3>
                     ) : (
                       <Link href={`/product/${item.productId}`}>
@@ -165,9 +166,12 @@ export default function CartPage() {
                   ${(totalPrice + (totalPrice >= 100 ? 0 : 9.99)).toFixed(2)}
                 </span>
               </div>
-              <button className="w-full bg-dark text-white font-heading font-semibold text-sm py-4 rounded-full hover:bg-dark/80 transition-colors duration-200 cursor-pointer">
+              <Link
+                href="/checkout"
+                className="block w-full bg-dark text-white font-heading font-semibold text-sm py-4 rounded-full hover:bg-dark/80 transition-colors duration-200 text-center"
+              >
                 Checkout
-              </button>
+              </Link>
               <Link
                 href="/"
                 className="block text-center text-xs text-muted hover:text-primary underline underline-offset-2 transition-colors duration-200"

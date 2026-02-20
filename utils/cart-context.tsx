@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import type { GarmentType } from "@/constants/garment-types";
 
 export interface ElementPosition {
   x: number;
@@ -30,6 +31,7 @@ export interface CustomDesignSide {
 
 export interface CustomDesign {
   shirtColor: string;
+  garmentType?: GarmentType;
   front?: CustomDesignSide;
   back?: CustomDesignSide;
   // Legacy flat fields kept for backward compat reads

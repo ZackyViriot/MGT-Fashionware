@@ -48,5 +48,6 @@ export interface Product {
   gender: string | null;
   sizes: string[];
   custom_design: ProductDesign | null;
+  garment_type?: string | null;
   created_at: string;
 }

@@ -47,3 +47,7 @@ export const LIGHT_SHIRT_VALUES = new Set([
   "#f87171", "#fda4af", "#86efac", "#6ee7b7", "#c4b5fd",
   "#fdba74", "#9ca3af",
 ]);
+
+// Aliases — colors work for all garment types
+export { SHIRT_COLORS as GARMENT_COLORS };
+export type { ShirtColor as GarmentColor };

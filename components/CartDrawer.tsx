@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { useCart } from "@/utils/cart-context";
 import { normalizeCustomDesign, sideHasContent } from "@/utils/design-helpers";
+import { GARMENT_CONFIGS, isValidGarmentType } from "@/constants/garment-types";
 import ShirtPreview from "./ShirtPreview";
 
 interface CartDrawerProps {
@@ -131,7 +132,7 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <div className="flex-1 min-w-0">
                       {item.isCustom ? (
                         <h3 className="text-[13px] font-semibold text-primary leading-snug truncate">
-                          Custom Shirt
+                          {`Custom ${isValidGarmentType(nd?.garmentType ?? "") ? GARMENT_CONFIGS[nd!.garmentType].label : "Shirt"}`}
                         </h3>
                       ) : (
                         <Link href={`/product/${item.productId}`} onClick={onClose}>
@@ -205,9 +206,13 @@ export default function CartDrawer({ open, onClose }: CartDrawerProps) {
                   You qualify for free shipping
                 </p>
               )}
-              <button className="w-full bg-dark text-white font-heading font-semibold text-sm py-3.5 rounded-full hover:bg-dark/80 transition-colors duration-200 cursor-pointer">
+              <Link
+                href="/checkout"
+                onClick={onClose}
+                className="block w-full bg-dark text-white font-heading font-semibold text-sm py-3.5 rounded-full hover:bg-dark/80 transition-colors duration-200 text-center"
+              >
                 Checkout
-              </button>
+              </Link>
               <Link
                 href="/cart"
                 onClick={onClose}

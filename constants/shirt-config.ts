@@ -1,25 +1,17 @@
+import { GARMENT_CONFIGS, type PrintArea } from "./garment-types";
+export type { GarmentType, GarmentSide, PrintArea } from "./garment-types";
+
 export type ShirtSide = "front" | "back";
 
-export interface PrintArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+const shirtConfig = GARMENT_CONFIGS.shirt;
 
-export const LOGICAL_WIDTH = 200;
-export const LOGICAL_HEIGHT = 240;
+export const LOGICAL_WIDTH = shirtConfig.logicalWidth;
+export const LOGICAL_HEIGHT = shirtConfig.logicalHeight;
 
 export const SHIRT_CONFIG: Record<
   ShirtSide,
   { imagePath: string; printArea: PrintArea }
-> = {
-  front: {
-    imagePath: "/shirts/front.png",
-    printArea: { x: 0, y: 0, width: 200, height: 240 },
-  },
-  back: {
-    imagePath: "/shirts/back.png",
-    printArea: { x: 0, y: 0, width: 200, height: 240 },
-  },
-};
+> = shirtConfig.sideConfigs as Record<
+  ShirtSide,
+  { imagePath: string; printArea: PrintArea }
+>;
