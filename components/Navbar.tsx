@@ -17,46 +17,51 @@ export default function Navbar() {
     <>
       <header className="sticky top-0 z-50 bg-bg/90 backdrop-blur-md border-b border-border">
         <nav className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-14">
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle menu"
-              className="lg:hidden text-primary"
-            >
-              {mobileOpen ? (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M6 6l12 12M6 18L18 6" />
-                </svg>
-              ) : (
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
-              )}
-            </button>
+          <div className="flex items-center h-14">
+            {/* Left — hamburger on mobile, nav links on desktop */}
+            <div className="flex-1 flex items-center">
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label="Toggle menu"
+                className="lg:hidden text-primary"
+              >
+                {mobileOpen ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M6 6l12 12M6 18L18 6" />
+                  </svg>
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M4 7h16M4 12h16M4 17h16" />
+                  </svg>
+                )}
+              </button>
 
+              <div className="hidden lg:flex items-center gap-8">
+                <Link href="/" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                  Home
+                </Link>
+                <Link href="/men" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                  Men
+                </Link>
+                <Link href="/women" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                  Women
+                </Link>
+                <Link href="/custom" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                  Custom
+                </Link>
+                <Link href="/admin" className="text-sm text-muted hover:text-primary transition-colors duration-200">
+                  Admin
+                </Link>
+              </div>
+            </div>
+
+            {/* Center — logo, always centered */}
             <Link href="/" className="font-heading font-bold text-xl tracking-tight text-primary">
               MGT
             </Link>
 
-            <div className="hidden lg:flex items-center gap-8">
-              <Link href="/" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                Home
-              </Link>
-              <Link href="/men" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                Men
-              </Link>
-              <Link href="/women" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                Women
-              </Link>
-              <Link href="/custom" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                Custom
-              </Link>
-              <Link href="/admin" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                Admin
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-4">
+            {/* Right — icons */}
+            <div className="flex-1 flex items-center justify-end gap-4">
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
                 aria-label="Search"
@@ -76,7 +81,7 @@ export default function Navbar() {
                   <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" />
                 </svg>
                 {totalItems > 0 && (
-                  <span className="absolute -top-2 -right-2 w-4.5 h-4.5 bg-dark text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                  <span className="absolute -top-2 -right-2 w-[18px] h-[18px] bg-dark text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
                     {totalItems > 99 ? "99+" : totalItems}
                   </span>
                 )}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Order, OrderLineItem } from "@/types/order";
 import { GARMENT_CONFIGS, isValidGarmentType } from "@/constants/garment-types";
+import ClearCartOnMount from "@/components/ClearCartOnMount";
 
 function getCustomLabel(garmentType?: string): string {
   if (garmentType && isValidGarmentType(garmentType)) return GARMENT_CONFIGS[garmentType].label;
@@ -61,6 +62,7 @@ export default async function OrderConfirmationPage({
 
   return (
     <section className="px-6 py-10">
+      <ClearCartOnMount />
       <div className="max-w-3xl mx-auto">
         {/* Success header */}
         <div className="text-center mb-10">

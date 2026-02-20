@@ -52,9 +52,12 @@ export default async function CustomLandingPage() {
                     {config.description}
                   </p>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-                    <span className="font-heading font-bold text-primary">
-                      ${config.basePrice}.00
-                    </span>
+                    <div>
+                      <span className="font-heading font-bold text-primary">
+                        From ${config.basePrice}.00
+                      </span>
+                      <p className="text-[10px] text-muted mt-0.5">+$2.50 per extra element</p>
+                    </div>
                     <span className="text-xs text-muted">
                       {config.sides.length === 1 ? "Front only" : "Front & Back"}
                     </span>

@@ -836,7 +836,8 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                       type="text"
                       value={item.text}
                       onChange={(e) => updateTextItem(item.id, { text: e.target.value })}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); setSelectedTextId(item.id); }}
+                      onFocus={() => setSelectedTextId(item.id)}
                       placeholder="Enter text..."
                       maxLength={14}
                       className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none"

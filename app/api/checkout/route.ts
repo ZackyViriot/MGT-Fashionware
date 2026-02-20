@@ -86,10 +86,35 @@ export async function POST(request: Request) {
     );
     const shippingCost = subtotal >= 100 ? 0 : 9.99;
 
-    // Build Stripe line items
+    // Create (or reuse) a Stripe Customer so automatic tax has an address
+    const customer = await stripe.customers.create({
+      name: customerName.trim(),
+      email: customerEmail.trim(),
+      phone: customerPhone.trim(),
+      address: {
+        line1: shippingAddress.trim(),
+        city: shippingCity.trim(),
+        state: shippingState.trim(),
+        postal_code: shippingZip.trim(),
+        country: "US",
+      },
+      shipping: {
+        name: customerName.trim(),
+        address: {
+          line1: shippingAddress.trim(),
+          city: shippingCity.trim(),
+          state: shippingState.trim(),
+          postal_code: shippingZip.trim(),
+          country: "US",
+        },
+      },
+    });
+
+    // Build Stripe line items with tax_behavior so automatic tax can apply
     const lineItems = items.map((item) => ({
       price_data: {
         currency: "usd",
+        tax_behavior: "exclusive" as const,
         product_data: {
           name: item.isCustom
             ? `Custom ${item.garmentType || "Shirt"} - ${item.color} / ${item.size}`
@@ -108,6 +133,7 @@ export async function POST(request: Request) {
       lineItems.push({
         price_data: {
           currency: "usd",
+          tax_behavior: "exclusive" as const,
           product_data: {
             name: "Shipping",
           },
@@ -148,7 +174,7 @@ export async function POST(request: Request) {
       mode: "payment",
       automatic_tax: { enabled: true },
       line_items: lineItems,
-      customer_email: customerEmail.trim(),
+      customer: customer.id,
       success_url: `${origin}/order-confirmation/{CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout`,
       metadata: {

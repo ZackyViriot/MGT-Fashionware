@@ -59,8 +59,8 @@ export default function ShirtEditorCanvas({
   const textRefs = useRef<Record<string, Konva.Text | null>>({});
   const trRef = useRef<Konva.Transformer>(null);
 
-  const callbacksRef = useRef({ onImagePosChange, onTextItemPosChange });
-  callbacksRef.current = { onImagePosChange, onTextItemPosChange };
+  const callbacksRef = useRef({ onImagePosChange, onTextItemPosChange, onDeselect });
+  callbacksRef.current = { onImagePosChange, onTextItemPosChange, onDeselect };
 
   const printArea = config.sideConfigs[side].printArea;
 

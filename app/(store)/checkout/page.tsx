@@ -16,7 +16,7 @@ const US_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice } = useCart();
   const shippingCost = totalPrice >= 100 ? 0 : 9.99;
   const total = totalPrice + shippingCost;
 
@@ -80,8 +80,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Clear cart and redirect to Stripe Checkout
-      clearCart();
+      // Redirect to Stripe Checkout (cart is cleared on confirmation page)
       window.location.href = data.url;
     } catch {
       setError("Network error. Please try again.");

@@ -76,6 +76,16 @@ export default function GarmentDesigner({ garmentType }: Props) {
     backDesign.textItems.length > 0 || backDesign.imageData.length > 0;
   const canAdd = frontHasContent || backHasContent;
 
+  // Dynamic pricing: base price includes 1 element, +$2.50 per additional
+  const EXTRA_ELEMENT_PRICE = 2.5;
+  const totalElements =
+    (frontDesign.imageData ? 1 : 0) +
+    frontDesign.textItems.length +
+    (backDesign.imageData ? 1 : 0) +
+    backDesign.textItems.length;
+  const extraElements = Math.max(0, totalElements - 1);
+  const dynamicPrice = config.basePrice + extraElements * EXTRA_ELEMENT_PRICE;
+
   function handleShirtColorChange(color: string) {
     setShirtColor(color);
     const newOptions = getTextColors(color);
@@ -196,7 +206,7 @@ export default function GarmentDesigner({ garmentType }: Props) {
     addItem({
       productId: `custom-${garmentType}-${Date.now()}`,
       name: `Custom ${config.label}`,
-      price: config.basePrice,
+      price: dynamicPrice,
       image: "",
       color:
         SHIRT_COLORS.find((c) => c.value === shirtColor)?.name || shirtColor,
@@ -425,7 +435,8 @@ export default function GarmentDesigner({ garmentType }: Props) {
                         onChange={(e) =>
                           updateTextItem(item.id, { text: e.target.value })
                         }
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setSelectedTextId(item.id); }}
+                        onFocus={() => setSelectedTextId(item.id)}
                         placeholder="Enter text..."
                         maxLength={14}
                         className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none"
@@ -613,9 +624,16 @@ export default function GarmentDesigner({ garmentType }: Props) {
 
             {/* -- Price + Add to Cart -- */}
             <div className="border-t border-border pt-6 space-y-4">
-              <span className="font-heading font-bold text-2xl">
-                ${config.basePrice}.00
-              </span>
+              <div>
+                <span className="font-heading font-bold text-2xl">
+                  ${dynamicPrice.toFixed(2)}
+                </span>
+                {extraElements > 0 && (
+                  <p className="text-xs text-muted mt-1">
+                    ${config.basePrice}.00 base + {extraElements} extra {extraElements === 1 ? "element" : "elements"} &times; ${EXTRA_ELEMENT_PRICE.toFixed(2)}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleAddToCart}
                 disabled={!canAdd}
