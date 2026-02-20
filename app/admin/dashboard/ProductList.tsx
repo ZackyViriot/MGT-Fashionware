@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { Product } from "@/types/product";
+import { normalizeDesign, sideHasContent } from "@/utils/design-helpers";
+import ShirtPreview from "@/components/ShirtPreview";
 import ProductForm from "./ProductForm";
 
 export default function ProductList({ initialProducts }: { initialProducts: Product[] }) {
@@ -73,19 +75,51 @@ export default function ProductList({ initialProducts }: { initialProducts: Prod
             {initialProducts.map((product) => (
               <tr key={product.id} className="border-b border-border/50 hover:bg-bg/50 transition-colors duration-150">
                 <td className="py-3 pr-4">
-                  {product.images && product.images.length > 0 ? (
-                    <Image
-                      src={product.images[0]}
-                      alt={product.name}
-                      width={48}
-                      height={48}
-                      className="w-10 h-10 object-cover rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-surface rounded-lg flex items-center justify-center">
-                      <span className="text-muted/40 text-[10px]">N/A</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const normalized = product.custom_design ? normalizeDesign(product.custom_design) : null;
+                    const design = normalized?.front;
+                    const variantImage = product.color_variants?.[0]?.image;
+                    const regularImage = product.images?.[0];
+                    const imageUrl = variantImage || regularImage;
+
+                    if (design && (sideHasContent(normalized?.front) || sideHasContent(normalized?.back))) {
+                      return (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface flex items-center justify-center">
+                          <ShirtPreview
+                            shirtColor={product.color_variants?.[0]?.hex ?? "#0a0a0a"}
+                            text={design.text}
+                            textColor={design.textColor}
+                            fontFamily={design.fontFamily}
+                            fontSize={design.fontSize}
+                            imageData={design.imageData}
+                            imagePos={design.imagePos}
+                            textPos={design.textPos}
+                            textItems={design.textItems}
+                            side="front"
+                            className="w-10 h-10"
+                          />
+                        </div>
+                      );
+                    }
+
+                    if (imageUrl) {
+                      return (
+                        <Image
+                          src={imageUrl}
+                          alt={product.name}
+                          width={48}
+                          height={48}
+                          className="w-10 h-10 object-cover rounded-lg"
+                        />
+                      );
+                    }
+
+                    return (
+                      <div className="w-10 h-10 bg-surface rounded-lg flex items-center justify-center">
+                        <span className="text-muted/40 text-[10px]">N/A</span>
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td className="py-3 pr-4 text-sm font-medium">{product.name}</td>
                 <td className="py-3 pr-4 text-sm text-muted">{product.category || "\u2014"}</td>
