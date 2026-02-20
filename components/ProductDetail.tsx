@@ -111,6 +111,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                   imageData={activeSideDesign?.imageData}
                   imagePos={activeSideDesign?.imagePos}
                   textPos={activeSideDesign?.textPos}
+                  textItems={activeSideDesign?.textItems}
                   side={viewSide}
                   className="w-full max-w-md"
                 />

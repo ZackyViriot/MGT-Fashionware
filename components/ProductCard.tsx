@@ -36,6 +36,7 @@ export default function ProductCard({ product }: { product: Product }) {
                 imageData={design.imageData}
                 imagePos={design.imagePos}
                 textPos={design.textPos}
+                textItems={design.textItems}
                 side="front"
                 className="w-full h-full"
               />

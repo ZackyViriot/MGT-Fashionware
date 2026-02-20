@@ -146,6 +146,7 @@ export async function POST(request: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      automatic_tax: { enabled: true },
       line_items: lineItems,
       customer_email: customerEmail.trim(),
       success_url: `${origin}/order-confirmation/{CHECKOUT_SESSION_ID}`,
