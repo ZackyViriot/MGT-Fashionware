@@ -832,17 +832,16 @@ export default function ProductForm({ editProduct, onCancel, onSuccess }: Produc
                     }`}
                   >
                     <span className="text-[10px] text-muted w-5 shrink-0">#{idx + 1}</span>
-                    <input
-                      type="text"
+                    <textarea
                       value={item.text}
                       onChange={(e) => updateTextItem(item.id, { text: e.target.value })}
                       onClick={(e) => { e.stopPropagation(); setSelectedTextId(item.id); }}
                       onFocus={() => setSelectedTextId(item.id)}
                       placeholder="Enter text..."
-                      maxLength={14}
-                      className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none"
+                      rows={1}
+                      onInput={(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }}
+                      className="flex-1 bg-transparent text-sm text-primary placeholder:text-muted/50 focus:outline-none resize-none leading-snug"
                     />
-                    <span className="text-[10px] text-muted shrink-0">{item.text.length}/14</span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeTextField(item.id); }}
