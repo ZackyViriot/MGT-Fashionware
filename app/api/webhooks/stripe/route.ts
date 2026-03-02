@@ -9,15 +9,25 @@ export async function POST(request: Request) {
   // If no webhook secret is configured, skip signature verification (dev mode)
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not set — rejecting webhook");
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 400 }
+    );
+  }
+
+  if (!signature) {
+    return NextResponse.json(
+      { error: "Missing stripe-signature header" },
+      { status: 400 }
+    );
+  }
+
   let event;
 
   try {
-    if (webhookSecret && signature) {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } else {
-      // In development without webhook secret, parse the event directly
-      event = JSON.parse(body);
-    }
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json(

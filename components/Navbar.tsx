@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/utils/cart-context";
 import CartDrawer from "./CartDrawer";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const { totalItems } = useCart();
+  const router = useRouter();
 
   const closeCart = useCallback(() => setCartOpen(false), []);
 
@@ -48,9 +51,6 @@ export default function Navbar() {
                 </Link>
                 <Link href="/custom" className="text-sm text-muted hover:text-primary transition-colors duration-200">
                   Custom
-                </Link>
-                <Link href="/admin" className="text-sm text-muted hover:text-primary transition-colors duration-200">
-                  Admin
                 </Link>
               </div>
             </div>
@@ -91,15 +91,28 @@ export default function Navbar() {
 
           {searchOpen && (
             <div className="py-3 border-t border-border animate-slide-down">
-              <div className="flex items-center gap-3">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchQuery.trim()) {
+                    router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                  }
+                }}
+                className="flex items-center gap-3"
+              >
                 <input
                   type="text"
                   placeholder="Search products..."
                   autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1 bg-surface rounded-lg px-4 py-2.5 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200"
                 />
                 <button
-                  onClick={() => setSearchOpen(false)}
+                  type="button"
+                  onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
                   aria-label="Close search"
                   className="text-muted hover:text-primary transition-colors duration-200"
                 >
@@ -107,7 +120,7 @@ export default function Navbar() {
                     <path d="M6 6l12 12M6 18L18 6" />
                   </svg>
                 </button>
-              </div>
+              </form>
             </div>
           )}
         </nav>
@@ -118,7 +131,6 @@ export default function Navbar() {
             <Link href="/men" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Men</Link>
             <Link href="/women" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Women</Link>
             <Link href="/custom" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Custom</Link>
-            <Link href="/admin" onClick={() => setMobileOpen(false)} className="block text-lg text-primary py-2">Admin</Link>
           </div>
         )}
       </header>

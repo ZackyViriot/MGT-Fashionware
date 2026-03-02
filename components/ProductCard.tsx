@@ -11,39 +11,90 @@ export default function ProductCard({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
   const fallbackImage = product.images?.[0];
   const [activeIndex, setActiveIndex] = useState(0);
+  const [showBack, setShowBack] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const normalized = normalizeDesign(product.custom_design);
   const design = normalized.front;
   const hasBack = sideHasContent(normalized.back);
+  const mainSide = showBack ? normalized.back : normalized.front;
+  const thumbSide = showBack ? normalized.front : normalized.back;
+  const mainSideKey = showBack ? "back" : "front";
+  const thumbSideKey = showBack ? "front" : "back";
 
+  const activeVariant = variants[activeIndex];
   const displayImage = variants.length > 0
-    ? variants[activeIndex]?.image
+    ? activeVariant?.image
     : fallbackImage;
 
-  const activeShirtColor = variants[activeIndex]?.hex ?? "#0a0a0a";
+  const activeShirtColor = activeVariant?.hex ?? "#0a0a0a";
+
+  // Build gallery from modelImages for hover-to-cycle
+  const modelImages = activeVariant?.modelImages;
+  const allModelPhotos: string[] = [];
+  if (modelImages) {
+    allModelPhotos.push(...modelImages.front, ...modelImages.back);
+  }
+  const hasMultiplePhotos = allModelPhotos.length >= 2;
+
+  // The image to show: on hover, show second photo if available
+  const heroImage = displayImage;
+  const hoverImage = hasMultiplePhotos ? allModelPhotos[1] : null;
+  const shownImage = hovered && hoverImage ? hoverImage : heroImage;
+
+  // If design exists but the active variant has a generated AI model image, show the photo instead
+  const hasModelImage = design && displayImage;
 
   return (
     <div className="group">
       <Link href={`/product/${product.id}`} className="block">
-        <div className="relative overflow-hidden rounded-lg bg-surface aspect-[3/4]">
-          {design ? (
+        <div
+          className="relative overflow-hidden rounded-lg bg-surface aspect-[3/4]"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          {hasModelImage ? (
+            <Image
+              src={shownImage!}
+              alt={product.name}
+              fill
+              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            />
+          ) : design ? (
             <div className="absolute inset-0 flex items-center justify-center p-4">
               <ShirtPreview
                 shirtColor={activeShirtColor}
-                text={design.text}
-                textColor={design.textColor}
-                fontFamily={design.fontFamily}
-                fontSize={design.fontSize}
-                imageData={design.imageData}
-                imagePos={design.imagePos}
-                textPos={design.textPos}
-                textItems={design.textItems}
-                side="front"
+                text={mainSide?.text}
+                textColor={mainSide?.textColor}
+                fontFamily={mainSide?.fontFamily}
+                fontSize={mainSide?.fontSize}
+                imageData={mainSide?.imageData}
+                imagePos={mainSide?.imagePos}
+                textPos={mainSide?.textPos}
+                textItems={mainSide?.textItems}
+                side={mainSideKey}
                 className="w-full h-full"
               />
               {hasBack && (
-                <span className="absolute top-2 right-2 bg-dark/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-                  Front &amp; Back
-                </span>
+                <div
+                  className="absolute bottom-2 right-2 w-16 h-20 rounded-md overflow-hidden border-2 border-white/50 bg-surface shadow-md cursor-pointer transition-all duration-200 hover:scale-110 hover:border-white/80"
+                  onMouseEnter={() => setShowBack((prev) => !prev)}
+                  onMouseLeave={() => {}}
+                >
+                  <ShirtPreview
+                    shirtColor={activeShirtColor}
+                    text={thumbSide?.text}
+                    textColor={thumbSide?.textColor}
+                    fontFamily={thumbSide?.fontFamily}
+                    fontSize={thumbSide?.fontSize}
+                    imageData={thumbSide?.imageData}
+                    imagePos={thumbSide?.imagePos}
+                    textPos={thumbSide?.textPos}
+                    textItems={thumbSide?.textItems}
+                    side={thumbSideKey}
+                    className="w-full h-full"
+                  />
+                </div>
               )}
             </div>
           ) : displayImage ? (

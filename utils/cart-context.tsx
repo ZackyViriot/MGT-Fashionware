@@ -7,6 +7,7 @@ export interface ElementPosition {
   x: number;
   y: number;
   scale: number;
+  rotation?: number;
 }
 
 export interface TextItem {
@@ -58,7 +59,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeItem: (productId: string, color: string, size: string) => void;
   updateQuantity: (productId: string, color: string, size: string, quantity: number) => void;
   clearCart: () => void;
@@ -88,7 +89,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, loaded]);
 
-  const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
+  const addItem = useCallback((item: Omit<CartItem, "quantity">, quantity: number = 1) => {
     setItems((prev) => {
       const existing = prev.find(
         (i) => i.productId === item.productId && i.color === item.color && i.size === item.size
@@ -96,11 +97,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (existing) {
         return prev.map((i) =>
           i.productId === item.productId && i.color === item.color && i.size === item.size
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...i, quantity: i.quantity + quantity }
             : i
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity }];
     });
   }, []);
 

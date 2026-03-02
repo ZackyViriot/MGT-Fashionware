@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getEnabledCategories } from "@/hooks/category-settings-server";
 import { GARMENT_CONFIGS, type GarmentType } from "@/constants/garment-types";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Custom Designer",
+  description: "Design your own custom garment — choose your style, colors, and graphics with the MGT Fashion custom designer.",
+};
 
 export default async function CustomLandingPage() {
   const enabledCategories = await getEnabledCategories();

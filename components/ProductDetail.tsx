@@ -2,12 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/utils/cart-context";
 import type { Product } from "@/types/product";
 import { normalizeDesign, sideHasContent } from "@/utils/design-helpers";
-import type { ShirtSide } from "@/constants/shirt-config";
 import ShirtPreview from "./ShirtPreview";
+
+interface GalleryImage {
+  url: string;
+  label: string;
+}
 
 export default function ProductDetail({ product }: { product: Product }) {
   const variants = product.color_variants ?? [];
@@ -18,20 +22,38 @@ export default function ProductDetail({ product }: { product: Product }) {
 
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
-  const [viewSide, setViewSide] = useState<ShirtSide>("front");
+  const [activeSide, setActiveSide] = useState<"front" | "back">("front");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const { addItem } = useCart();
 
-  const displayImage = hasVariants
-    ? variants[selectedColor]?.image
-    : product.images?.[0];
+  const currentVariant = hasVariants ? variants[selectedColor] : null;
+  const displayImage = currentVariant?.image ?? product.images?.[0];
+  const activeShirtColor = currentVariant?.hex ?? "#0a0a0a";
+
+  // Build gallery from modelImages
+  const modelImages = currentVariant?.modelImages;
+  const galleryImages: GalleryImage[] = [];
+  if (modelImages) {
+    modelImages.front.forEach((url, i) => galleryImages.push({ url, label: `Front ${i + 1}` }));
+    modelImages.back.forEach((url, i) => galleryImages.push({ url, label: `Back ${i + 1}` }));
+  }
+  // Fallback: if no modelImages but there's a single AI image
+  if (galleryImages.length === 0 && hasDesign && displayImage) {
+    galleryImages.push({ url: displayImage, label: "Front 1" });
+  }
+
+  const hasModelGallery = hasDesign && galleryImages.length > 0;
 
   const allImages = hasVariants
-    ? [variants[selectedColor]?.image].filter(Boolean) as string[]
+    ? [currentVariant?.image].filter(Boolean) as string[]
     : product.images ?? [];
 
-  const activeShirtColor = variants[selectedColor]?.hex ?? "#0a0a0a";
-  const activeSideDesign = viewSide === "front" ? normalized.front : normalized.back;
+  // Reset gallery index when color changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedColor]);
 
   function handleAddToCart() {
     if (!selectedSize) return;
@@ -45,9 +67,10 @@ export default function ProductDetail({ product }: { product: Product }) {
       image,
       color: colorName,
       size: selectedSize,
-    });
+    }, quantity);
 
     setAdded(true);
+    setQuantity(1);
     setTimeout(() => setAdded(false), 2000);
   }
 
@@ -81,56 +104,151 @@ export default function ProductDetail({ product }: { product: Product }) {
         </nav>
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-          {/* Images / Shirt Preview */}
-          <div className="space-y-3">
-            {hasDesign ? (
-              <div className="overflow-hidden rounded-2xl bg-surface flex flex-col items-center justify-center p-8">
-                {hasBack && (
-                  <div className="flex justify-center gap-1 mb-4">
-                    {(["front", "back"] as const).map((s) => (
+          {/* Images / Shirt Preview — Nike-style thumbnails + main view */}
+          <div className="flex gap-3">
+            {hasModelGallery ? (
+              /* AI model photo gallery for custom-design product */
+              <>
+                {galleryImages.length > 1 && (
+                  <div className="flex flex-col gap-2 w-16 shrink-0">
+                    {galleryImages.map((img, i) => (
                       <button
-                        key={s}
-                        onClick={() => setViewSide(s)}
-                        className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-                          viewSide === s
-                            ? "bg-dark text-white"
-                            : "bg-bg text-muted hover:text-primary border border-border"
+                        key={`${selectedColor}-model-${i}`}
+                        onClick={() => setActiveImageIndex(i)}
+                        className={`relative rounded-lg overflow-hidden bg-surface aspect-[3/4] border-2 transition-all duration-200 cursor-pointer ${
+                          activeImageIndex === i
+                            ? "border-dark"
+                            : "border-transparent hover:border-muted"
                         }`}
                       >
-                        {s === "front" ? "Front" : "Back"}
+                        <Image
+                          src={img.url}
+                          alt={`${product.name} - ${img.label}`}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                        <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/50 text-white py-0.5 leading-none">
+                          {img.label}
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
+                <div className="flex-1 overflow-hidden rounded-2xl bg-surface">
+                  <Image
+                    src={galleryImages[activeImageIndex]?.url ?? displayImage!}
+                    alt={`${product.name} - ${galleryImages[activeImageIndex]?.label ?? "Photo"}`}
+                    width={600}
+                    height={800}
+                    priority
+                    className="w-full h-auto object-cover"
+                  />
+                </div>
+              </>
+            ) : hasDesign && hasBack ? (
+              <>
+                <div className="flex flex-col gap-2 w-16 shrink-0">
+                  {(["front", "back"] as const).map((side) => {
+                    const sideData = normalized[side];
+                    return (
+                      <button
+                        key={side}
+                        onClick={() => setActiveSide(side)}
+                        className={`relative rounded-lg overflow-hidden bg-surface aspect-[3/4] border-2 transition-all duration-200 cursor-pointer ${
+                          activeSide === side
+                            ? "border-dark"
+                            : "border-transparent hover:border-muted"
+                        }`}
+                      >
+                        <ShirtPreview
+                          shirtColor={activeShirtColor}
+                          text={sideData?.text}
+                          textColor={sideData?.textColor}
+                          fontFamily={sideData?.fontFamily}
+                          fontSize={sideData?.fontSize}
+                          imageData={sideData?.imageData}
+                          imagePos={sideData?.imagePos}
+                          textPos={sideData?.textPos}
+                          textItems={sideData?.textItems}
+                          side={side}
+                          className="w-full h-full"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Main preview */}
+                <div className="flex-1 overflow-hidden rounded-2xl bg-surface flex items-center justify-center p-8">
+                  <ShirtPreview
+                    shirtColor={activeShirtColor}
+                    text={normalized[activeSide]?.text}
+                    textColor={normalized[activeSide]?.textColor}
+                    fontFamily={normalized[activeSide]?.fontFamily}
+                    fontSize={normalized[activeSide]?.fontSize}
+                    imageData={normalized[activeSide]?.imageData}
+                    imagePos={normalized[activeSide]?.imagePos}
+                    textPos={normalized[activeSide]?.textPos}
+                    textItems={normalized[activeSide]?.textItems}
+                    side={activeSide}
+                    className="w-full max-w-md"
+                  />
+                </div>
+              </>
+            ) : hasDesign ? (
+              <div className="flex-1 overflow-hidden rounded-2xl bg-surface flex items-center justify-center p-8">
                 <ShirtPreview
                   shirtColor={activeShirtColor}
-                  text={activeSideDesign?.text}
-                  textColor={activeSideDesign?.textColor}
-                  fontFamily={activeSideDesign?.fontFamily}
-                  fontSize={activeSideDesign?.fontSize}
-                  imageData={activeSideDesign?.imageData}
-                  imagePos={activeSideDesign?.imagePos}
-                  textPos={activeSideDesign?.textPos}
-                  textItems={activeSideDesign?.textItems}
-                  side={viewSide}
+                  text={normalized.front?.text}
+                  textColor={normalized.front?.textColor}
+                  fontFamily={normalized.front?.fontFamily}
+                  fontSize={normalized.front?.fontSize}
+                  imageData={normalized.front?.imageData}
+                  imagePos={normalized.front?.imagePos}
+                  textPos={normalized.front?.textPos}
+                  textItems={normalized.front?.textItems}
+                  side="front"
                   className="w-full max-w-md"
                 />
               </div>
             ) : allImages.length > 0 ? (
-              allImages.map((url, i) => (
-                <div key={`${selectedColor}-${i}`} className="overflow-hidden rounded-2xl bg-surface">
+              <>
+                {allImages.length > 1 && (
+                  <div className="flex flex-col gap-2 w-16 shrink-0">
+                    {allImages.map((url, i) => (
+                      <button
+                        key={`${selectedColor}-thumb-${i}`}
+                        onClick={() => setActiveImageIndex(i)}
+                        className={`relative rounded-lg overflow-hidden bg-surface aspect-[3/4] border-2 transition-all duration-200 cursor-pointer ${
+                          activeImageIndex === i
+                            ? "border-dark"
+                            : "border-transparent hover:border-muted"
+                        }`}
+                      >
+                        <Image
+                          src={url}
+                          alt={`${product.name} - Thumb ${i + 1}`}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex-1 overflow-hidden rounded-2xl bg-surface">
                   <Image
-                    src={url}
-                    alt={`${product.name} - Image ${i + 1}`}
+                    src={allImages[activeImageIndex] ?? allImages[0]}
+                    alt={`${product.name}`}
                     width={600}
                     height={800}
-                    priority={i === 0}
+                    priority
                     className="w-full h-auto object-cover"
                   />
                 </div>
-              ))
+              </>
             ) : (
-              <div className="w-full aspect-[3/4] bg-surface rounded-2xl flex items-center justify-center">
+              <div className="flex-1 aspect-[3/4] bg-surface rounded-2xl flex items-center justify-center">
                 <p className="text-muted/50 text-sm">No images available</p>
               </div>
             )}
@@ -184,6 +302,12 @@ export default function ProductDetail({ product }: { product: Product }) {
                   <h3 className="font-heading font-semibold text-xs uppercase tracking-widest text-primary">
                     Select size
                   </h3>
+                  <Link
+                    href="/size-guide"
+                    className="text-xs text-muted hover:text-primary underline underline-offset-2 transition-colors duration-200"
+                  >
+                    Size Guide
+                  </Link>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {product.sizes.map((size) => (
@@ -203,6 +327,34 @@ export default function ProductDetail({ product }: { product: Product }) {
               </div>
             )}
 
+            {/* Quantity */}
+            <div>
+              <h3 className="font-heading font-semibold text-xs uppercase tracking-widest text-primary mb-3">
+                Quantity
+              </h3>
+              <div className="flex items-center border border-border rounded-lg w-fit">
+                <button
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="w-10 h-10 flex items-center justify-center text-muted hover:text-primary transition-colors duration-200 cursor-pointer"
+                  aria-label="Decrease quantity"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+                <span className="w-10 text-center text-sm font-semibold text-primary">{quantity}</span>
+                <button
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="w-10 h-10 flex items-center justify-center text-muted hover:text-primary transition-colors duration-200 cursor-pointer"
+                  aria-label="Increase quantity"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
             {/* Add to Cart */}
             <button
               onClick={handleAddToCart}
@@ -215,7 +367,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                     : "bg-border text-muted cursor-not-allowed"
               }`}
             >
-              {added ? "Added to Cart" : selectedSize ? "Add to Cart" : "Select a Size"}
+              {added ? "Added to Cart" : selectedSize ? `Add to Cart${quantity > 1 ? ` (${quantity})` : ""}` : "Select a Size"}
             </button>
 
             <div className="flex flex-wrap gap-5">

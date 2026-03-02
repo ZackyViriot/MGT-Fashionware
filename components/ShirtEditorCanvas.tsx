@@ -2,7 +2,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Stage, Layer, Image as KImage, Text as KText, Group, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Image as KImage, Text as KText, Group, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import { type ShirtSide } from "@/constants/shirt-config";
@@ -64,8 +64,10 @@ export default function ShirtEditorCanvas({
 
   const printArea = config.sideConfigs[side].printArea;
 
-  const imgW = IMAGE_BASE * imagePos.scale;
-  const imgH = IMAGE_BASE * imagePos.scale;
+  // Preserve the uploaded image's aspect ratio instead of forcing a square
+  const aspectRatio = designImage ? designImage.naturalWidth / designImage.naturalHeight : 1;
+  const imgW = IMAGE_BASE * imagePos.scale * (aspectRatio >= 1 ? 1 : aspectRatio);
+  const imgH = IMAGE_BASE * imagePos.scale * (aspectRatio >= 1 ? 1 / aspectRatio : 1);
 
   // Sync internal selection with parent
   useEffect(() => {
@@ -119,8 +121,9 @@ export default function ShirtEditorCanvas({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
       scale: imagePos.scale,
+      rotation: imagePos.rotation ?? 0,
     });
-  }, [scaleX, scaleY, imagePos.scale]);
+  }, [scaleX, scaleY, imagePos.scale, imagePos.rotation]);
 
   const onTextDragEnd = useCallback((id: string) => (e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
@@ -129,6 +132,7 @@ export default function ShirtEditorCanvas({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
       scale: item?.pos.scale ?? 1,
+      rotation: item?.pos.rotation ?? 0,
     });
   }, [scaleX, scaleY, textItems]);
 
@@ -136,10 +140,12 @@ export default function ShirtEditorCanvas({
     const node = e.target as Konva.Image;
     const newScaleX = node.scaleX();
     const newScale = imagePos.scale * newScaleX;
+    const newRotation = node.rotation();
     node.scaleX(1);
     node.scaleY(1);
-    const newW = IMAGE_BASE * newScale;
-    const newH = IMAGE_BASE * newScale;
+    const ar = designImage ? designImage.naturalWidth / designImage.naturalHeight : 1;
+    const newW = IMAGE_BASE * newScale * (ar >= 1 ? 1 : ar);
+    const newH = IMAGE_BASE * newScale * (ar >= 1 ? 1 / ar : 1);
     node.width(newW);
     node.height(newH);
     node.offsetX(newW / 2);
@@ -148,8 +154,9 @@ export default function ShirtEditorCanvas({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
       scale: newScale,
+      rotation: newRotation,
     });
-  }, [scaleX, scaleY, imagePos.scale]);
+  }, [scaleX, scaleY, imagePos.scale, designImage]);
 
   const onTextTransformEnd = useCallback((id: string) => (e: Konva.KonvaEventObject<Event>) => {
     const node = e.target as Konva.Text;
@@ -157,6 +164,7 @@ export default function ShirtEditorCanvas({
     const prevScale = item?.pos.scale ?? 1;
     const newScaleX = node.scaleX();
     const newScale = prevScale * newScaleX;
+    const newRotation = node.rotation();
     node.scaleX(1);
     node.scaleY(1);
     const newFontSize = (item?.fontSize ?? 24) * newScale;
@@ -167,11 +175,16 @@ export default function ShirtEditorCanvas({
       x: node.x() / scaleX,
       y: node.y() / scaleY,
       scale: newScale,
+      rotation: newRotation,
     });
   }, [scaleX, scaleY, textItems]);
 
-  const onStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (e.target === e.target.getStage()) {
+  const handleDeselect = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    // Deselect when clicking the stage or the background rect
+    const target = e.target;
+    const isStage = target === target.getStage();
+    const isBgRect = target.name?.() === "bg-deselect";
+    if (isStage || isBgRect) {
       setSelected(null);
       onDeselect();
     }
@@ -185,11 +198,21 @@ export default function ShirtEditorCanvas({
         <Stage
           width={width}
           height={height}
-          onClick={onStageClick}
-          onTap={onStageClick}
+          onClick={handleDeselect}
+          onTap={handleDeselect}
           style={{ touchAction: "none" }}
         >
           <Layer>
+            {/* Invisible rect to catch clicks on empty areas */}
+            <Rect
+              name="bg-deselect"
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="transparent"
+            />
+
             {/* Tinted shirt background */}
             {shirtImage && (
               <KImage
@@ -224,6 +247,7 @@ export default function ShirtEditorCanvas({
                   height={imgH * scaleY}
                   offsetX={(imgW * scaleX) / 2}
                   offsetY={(imgH * scaleY) / 2}
+                  rotation={imagePos.rotation ?? 0}
                   draggable
                   dragBoundFunc={dragBound}
                   onClick={() => { setSelected({ type: "image" }); onSelect("image"); }}
@@ -248,6 +272,7 @@ export default function ShirtEditorCanvas({
                     fontStyle="600"
                     align="center"
                     verticalAlign="middle"
+                    rotation={item.pos.rotation ?? 0}
                     draggable
                     dragBoundFunc={dragBound}
                     onClick={() => { setSelected({ type: "text", id: item.id }); onSelect("text", item.id); }}
@@ -269,7 +294,9 @@ export default function ShirtEditorCanvas({
             {/* Transformer for selected element */}
             <Transformer
               ref={trRef}
-              rotateEnabled={false}
+              rotateEnabled={true}
+              rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
+              rotationSnapTolerance={5}
               enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
               keepRatio={true}
               boundBoxFunc={(oldBox, newBox) => {
@@ -285,7 +312,7 @@ export default function ShirtEditorCanvas({
           <Layer listening={false}>
             {hasContent && !selected && (
               <KText
-                text="Click to select · Drag to move · Corners to resize"
+                text="Click to select · Drag to move · Corners to resize · Top handle to rotate"
                 x={0}
                 y={(logicalHeight - 8) * scaleY}
                 width={width}

@@ -1,13 +1,22 @@
 import { notFound } from "next/navigation";
-import { isValidGarmentType } from "@/constants/garment-types";
+import { isValidGarmentType, GARMENT_CONFIGS } from "@/constants/garment-types";
 import { getEnabledCategories } from "@/hooks/category-settings-server";
 import GarmentDesigner from "./GarmentDesigner";
+import type { Metadata } from "next";
 
-export default async function CustomTypePage({
-  params,
-}: {
-  params: Promise<{ type: string }>;
-}) {
+type Props = { params: Promise<{ type: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { type } = await params;
+  if (!isValidGarmentType(type)) return { title: "Custom Designer" };
+  const config = GARMENT_CONFIGS[type];
+  return {
+    title: `Design Your ${config.label}`,
+    description: config.description ?? `Create a custom ${config.label.toLowerCase()} with the MGT Fashion designer.`,
+  };
+}
+
+export default async function CustomTypePage({ params }: Props) {
   const { type } = await params;
 
   if (!isValidGarmentType(type)) {

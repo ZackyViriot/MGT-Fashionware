@@ -1,7 +1,13 @@
+export interface ModelImageSet {
+  front: string[];
+  back: string[];
+}
+
 export interface ColorVariant {
   color: string;
   hex: string;
   image: string;
+  modelImages?: ModelImageSet;
 }
 
 export interface SideDesignTextItem {

@@ -1,9 +1,22 @@
 import './globals.css';
 import { CartProvider } from '@/utils/cart-context';
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: 'MGT Fashion',
-  description: 'Curated vintage-inspired streetwear and independent fashion',
+export const metadata: Metadata = {
+  metadataBase: new URL("https://mgtfashion.com"),
+  title: {
+    default: "MGT Fashion",
+    template: "%s | MGT Fashion",
+  },
+  description: "Curated vintage-inspired streetwear and independent fashion",
+  openGraph: {
+    type: "website",
+    siteName: "MGT Fashion",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,8 +26,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Oswald:wght@400;500;600;700&family=Bebas+Neue&family=Pacifico&family=Lobster&family=Raleway:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600;700&family=Press+Start+2P&family=Permanent+Marker&family=Dancing+Script:wght@400;600;700&family=Abril+Fatface&family=Righteous&family=Orbitron:wght@400;500;600;700&family=Sacramento&family=Satisfy&family=Anton&family=Archivo+Black&display=swap"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "MGT Fashion",
+              url: "https://mgtfashion.com",
+              description: "Curated vintage-inspired streetwear and independent fashion",
+              contactPoint: {
+                "@type": "ContactPoint",
+                email: "support@mgtfashion.com",
+                contactType: "customer service",
+              },
+            }),
+          }}
         />
       </head>
       <body>

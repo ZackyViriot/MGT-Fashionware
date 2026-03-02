@@ -1,8 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 export default function Footer() {
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterStatus, setNewsletterStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
+
+  async function handleNewsletter(e: React.FormEvent) {
+    e.preventDefault();
+    setNewsletterStatus("submitting");
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newsletterEmail }),
+      });
+      if (res.ok) {
+        setNewsletterStatus("success");
+        setNewsletterEmail("");
+      } else {
+        setNewsletterStatus("error");
+      }
+    } catch {
+      setNewsletterStatus("error");
+    }
+  }
+
   return (
     <footer>
       {/* Newsletter Card */}
@@ -13,19 +39,32 @@ export default function Footer() {
             <p className="text-muted mt-3 text-sm">
               New arrivals, stories behind the pieces, and exclusive offers.
             </p>
-            <form onSubmit={(e) => e.preventDefault()} className="mt-6 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input
-                type="email"
-                placeholder="your@email.com"
-                className="flex-1 bg-white rounded-full px-5 py-3 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200"
-              />
-              <button
-                type="submit"
-                className="bg-dark text-white font-heading font-semibold text-sm px-6 py-3 rounded-full hover:bg-dark/80 transition-colors duration-200 cursor-pointer whitespace-nowrap"
-              >
-                Subscribe
-              </button>
-            </form>
+            {newsletterStatus === "success" ? (
+              <p className="mt-6 text-sm text-emerald-600 font-medium">
+                You&apos;re subscribed! Thanks for joining.
+              </p>
+            ) : (
+              <form onSubmit={handleNewsletter} className="mt-6 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <input
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="flex-1 bg-white rounded-full px-5 py-3 text-sm text-primary placeholder:text-muted/50 border border-border focus:border-primary focus:outline-none transition-colors duration-200"
+                />
+                <button
+                  type="submit"
+                  disabled={newsletterStatus === "submitting"}
+                  className="bg-dark text-white font-heading font-semibold text-sm px-6 py-3 rounded-full hover:bg-dark/80 transition-colors duration-200 cursor-pointer whitespace-nowrap disabled:opacity-50"
+                >
+                  {newsletterStatus === "submitting" ? "Subscribing..." : "Subscribe"}
+                </button>
+              </form>
+            )}
+            {newsletterStatus === "error" && (
+              <p className="mt-2 text-xs text-red-500">Something went wrong. Please try again.</p>
+            )}
           </div>
         </div>
       </section>
@@ -65,9 +104,8 @@ export default function Footer() {
                 Company
               </h3>
               <ul className="space-y-2.5">
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Our Story</Link></li>
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Contact</Link></li>
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Careers</Link></li>
+                <li><Link href="/about" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Our Story</Link></li>
+                <li><Link href="/contact" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Contact</Link></li>
               </ul>
             </div>
 
@@ -76,9 +114,9 @@ export default function Footer() {
                 Help
               </h3>
               <ul className="space-y-2.5">
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Shipping &amp; Returns</Link></li>
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Size Guide</Link></li>
-                <li><Link href="#" className="text-sm text-white/35 hover:text-white transition-colors duration-200">FAQ</Link></li>
+                <li><Link href="/shipping-returns" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Shipping &amp; Returns</Link></li>
+                <li><Link href="/size-guide" className="text-sm text-white/35 hover:text-white transition-colors duration-200">Size Guide</Link></li>
+                <li><Link href="/faq" className="text-sm text-white/35 hover:text-white transition-colors duration-200">FAQ</Link></li>
               </ul>
             </div>
           </div>
@@ -88,8 +126,8 @@ export default function Footer() {
               &copy; {new Date().getFullYear()} MGT Fashion. All rights reserved.
             </p>
             <div className="flex gap-6">
-              <Link href="#" className="text-xs text-white/20 hover:text-white/40 transition-colors duration-200">Privacy</Link>
-              <Link href="#" className="text-xs text-white/20 hover:text-white/40 transition-colors duration-200">Terms</Link>
+              <Link href="/privacy" className="text-xs text-white/20 hover:text-white/40 transition-colors duration-200">Privacy</Link>
+              <Link href="/terms" className="text-xs text-white/20 hover:text-white/40 transition-colors duration-200">Terms</Link>
             </div>
           </div>
         </div>

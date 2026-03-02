@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import ShirtEditor from "@/components/ShirtEditor";
+import ShirtPreview from "@/components/ShirtPreview";
 import { useCart } from "@/utils/cart-context";
 import type { ElementPosition, TextItem } from "@/utils/cart-context";
 import { SHIRT_COLORS } from "@/constants/shirt-colors";
@@ -59,6 +60,7 @@ export default function GarmentDesigner({ garmentType }: Props) {
   const [backDesign, setBackDesign] = useState<SideState>(defaultSideState);
   const [sizeCategory, setSizeCategory] = useState(0);
   const [size, setSize] = useState(config.sizeCategories[0].sizes[1] ?? config.sizeCategories[0].sizes[0]);
+  const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
 
@@ -102,6 +104,81 @@ export default function GarmentDesigner({ garmentType }: Props) {
     setBackDesign(fixColors);
   }
 
+  function removeOpaqueBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    // If image already has transparency, leave it alone
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 250) return;
+    }
+
+    // Sample 5x5 patches in each corner to check if background is light
+    const S = Math.min(5, Math.floor(w / 2), Math.floor(h / 2));
+    const corners = [[0, 0], [w - S, 0], [0, h - S], [w - S, h - S]];
+    let lightCount = 0;
+    let totalCount = 0;
+    for (const [cx, cy] of corners) {
+      for (let dx = 0; dx < S; dx++) {
+        for (let dy = 0; dy < S; dy++) {
+          const idx = ((cy + dy) * w + (cx + dx)) * 4;
+          const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+          if (brightness > 200) lightCount++;
+          totalCount++;
+        }
+      }
+    }
+    if (lightCount / totalCount < 0.75) return; // corners aren't light, skip
+
+    const THRESHOLD = 200;
+    const visited = new Uint8Array(w * h);
+    const queue: number[] = [];
+
+    // Seed all edge pixels that are light
+    for (let x = 0; x < w; x++) {
+      seedIfLight(x, 0);
+      seedIfLight(x, h - 1);
+    }
+    for (let y = 1; y < h - 1; y++) {
+      seedIfLight(0, y);
+      seedIfLight(w - 1, y);
+    }
+
+    function seedIfLight(x: number, y: number) {
+      const idx = y * w + x;
+      const p = idx * 4;
+      if ((data[p] + data[p + 1] + data[p + 2]) / 3 > THRESHOLD) {
+        queue.push(idx);
+      }
+    }
+
+    // BFS flood fill — remove connected light pixels from edges
+    let qi = 0;
+    while (qi < queue.length) {
+      const idx = queue[qi++];
+      if (visited[idx]) continue;
+      visited[idx] = 1;
+      data[idx * 4 + 3] = 0; // make transparent
+
+      const x = idx % w;
+      const y = (idx - x) / w;
+      if (x > 0) tryEnqueue(idx - 1);
+      if (x < w - 1) tryEnqueue(idx + 1);
+      if (y > 0) tryEnqueue(idx - w);
+      if (y < h - 1) tryEnqueue(idx + w);
+    }
+
+    function tryEnqueue(nIdx: number) {
+      if (visited[nIdx]) return;
+      const p = nIdx * 4;
+      if ((data[p] + data[p + 1] + data[p + 2]) / 3 > THRESHOLD) {
+        queue.push(nIdx);
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+  }
+
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -120,7 +197,8 @@ export default function GarmentDesigner({ garmentType }: Props) {
       canvas.height = height;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, width, height);
-      const compressed = canvas.toDataURL("image/jpeg", 0.8);
+      removeOpaqueBackground(ctx, width, height);
+      const compressed = canvas.toDataURL("image/png");
       setCurrent((prev) => ({
         ...prev,
         imageData: compressed,
@@ -218,8 +296,9 @@ export default function GarmentDesigner({ garmentType }: Props) {
         front: frontData,
         back: backData,
       },
-    });
+    }, quantity);
     setAdded(true);
+    setQuantity(1);
     setTimeout(() => setAdded(false), 2000);
   }
 
@@ -239,30 +318,74 @@ export default function GarmentDesigner({ garmentType }: Props) {
         </p>
 
         <div className="grid lg:grid-cols-2 gap-10">
-          {/* Left — Interactive Editor */}
-          <div className="bg-surface rounded-2xl p-8 lg:sticky lg:top-20 lg:self-start">
+          {/* Left — Interactive Editor + Preview */}
+          <div className="lg:sticky lg:top-20 lg:self-start space-y-4">
+            {/* Side tabs + inactive preview */}
             {config.sides.length > 1 && (
-              <div className="flex justify-center gap-1 mb-6">
-                {config.sides.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setActiveSide(s);
-                      setSelectedTextId(null);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                    className={`px-5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
-                      activeSide === s
-                        ? "bg-dark text-white"
-                        : "bg-bg text-muted hover:text-primary border border-border"
-                    }`}
-                  >
-                    {s === "front" ? "Front" : "Back"}
-                  </button>
-                ))}
+              <div className="flex items-center gap-3">
+                {config.sides.map((s) => {
+                  const isActive = activeSide === s;
+                  const sideState = s === "front" ? frontDesign : backDesign;
+                  const sideVisibleText = sideState.textItems.filter(
+                    (t) => t.text.trim().length > 0
+                  );
+
+                  return isActive ? (
+                    <button
+                      key={s}
+                      className="px-4 py-2 rounded-full text-xs font-semibold bg-dark text-white cursor-default"
+                    >
+                      {s === "front" ? "Front" : "Back"}
+                    </button>
+                  ) : (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setActiveSide(s);
+                        setSelectedTextId(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="px-4 py-2 rounded-full text-xs font-medium border border-border text-muted hover:text-primary hover:border-muted transition-all duration-200 cursor-pointer"
+                    >
+                      {s === "front" ? "Front" : "Back"}
+                    </button>
+                  );
+                })}
+
+                {/* Small preview of inactive side */}
+                {(() => {
+                  const inactiveSide = activeSide === "front" ? "back" : "front";
+                  const inactiveState = activeSide === "front" ? backDesign : frontDesign;
+                  const inactiveVisibleText = inactiveState.textItems.filter(
+                    (t) => t.text.trim().length > 0
+                  );
+                  return (
+                    <button
+                      onClick={() => {
+                        setActiveSide(inactiveSide as GarmentSide);
+                        setSelectedTextId(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="ml-auto w-14 h-[72px] rounded-lg overflow-hidden bg-surface border border-border hover:border-muted transition-all duration-200 cursor-pointer shrink-0"
+                      title={`Switch to ${inactiveSide}`}
+                    >
+                      <ShirtPreview
+                        shirtColor={shirtColor}
+                        imageData={inactiveState.imageData || undefined}
+                        imagePos={inactiveState.imagePos}
+                        textItems={inactiveVisibleText}
+                        side={inactiveSide}
+                        garmentType={garmentType}
+                        className="w-full h-full"
+                      />
+                    </button>
+                  );
+                })()}
               </div>
             )}
-            <div className="flex items-center justify-center">
+
+            {/* Full-width editor canvas */}
+            <div className="bg-surface rounded-2xl p-6">
               <ShirtEditor
                 shirtColor={shirtColor}
                 imageData={current.imageData || undefined}
@@ -279,23 +402,28 @@ export default function GarmentDesigner({ garmentType }: Props) {
                 onDeselect={handleDeselect}
                 side={activeSide}
                 garmentType={garmentType}
-                className="w-full max-w-sm"
+                className="w-full"
               />
             </div>
           </div>
 
           {/* Right — Controls */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* -- Color -- */}
             <div>
-              <label className="block text-sm font-semibold mb-3">Color</label>
+              <label className="block text-sm font-semibold mb-3">
+                {config.label} Color
+                <span className="font-normal text-muted ml-1.5">
+                  — {SHIRT_COLORS.find((c) => c.value === shirtColor)?.name}
+                </span>
+              </label>
               <div className="flex flex-wrap gap-2">
                 {SHIRT_COLORS.map((c) => (
                   <button
                     key={c.value}
                     onClick={() => handleShirtColorChange(c.value)}
                     title={c.name}
-                    className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
+                    className={`w-7 h-7 rounded-full border-2 transition-all duration-200 cursor-pointer ${
                       shirtColor === c.value
                         ? "border-primary scale-110 ring-2 ring-primary/20"
                         : "border-border hover:border-muted"
@@ -304,15 +432,14 @@ export default function GarmentDesigner({ garmentType }: Props) {
                   />
                 ))}
               </div>
-              <p className="text-xs text-muted mt-2">
-                {SHIRT_COLORS.find((c) => c.value === shirtColor)?.name}
-              </p>
             </div>
+
+            <hr className="border-border" />
 
             {/* -- Image Upload -- */}
             <div>
               <label className="block text-sm font-semibold mb-3">
-                Image ({activeSide})
+                Upload Image
               </label>
               {current.imageData ? (
                 <div className="flex items-center gap-3 bg-surface rounded-lg px-4 py-3 border border-border">
@@ -385,11 +512,13 @@ export default function GarmentDesigner({ garmentType }: Props) {
               />
             </div>
 
+            <hr className="border-border" />
+
             {/* -- Text Fields -- */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-sm font-semibold">
-                  Text ({activeSide})
+                  Text
                 </label>
                 <button
                   onClick={addTextField}
@@ -579,6 +708,8 @@ export default function GarmentDesigner({ garmentType }: Props) {
               </>
             )}
 
+            <hr className="border-border" />
+
             {/* -- Size -- */}
             <div>
               <label className="block text-sm font-semibold mb-3">Size</label>
@@ -619,6 +750,32 @@ export default function GarmentDesigner({ garmentType }: Props) {
               </div>
             </div>
 
+            {/* -- Quantity -- */}
+            <div>
+              <label className="block text-sm font-semibold mb-3">Quantity</label>
+              <div className="flex items-center border border-border rounded-lg w-fit">
+                <button
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="w-10 h-10 flex items-center justify-center text-muted hover:text-primary transition-colors duration-200 cursor-pointer"
+                  aria-label="Decrease quantity"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+                <span className="w-10 text-center text-sm font-semibold text-primary">{quantity}</span>
+                <button
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="w-10 h-10 flex items-center justify-center text-muted hover:text-primary transition-colors duration-200 cursor-pointer"
+                  aria-label="Increase quantity"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
             {/* -- Price + Add to Cart -- */}
             <div className="border-t border-border pt-6 space-y-4">
               <div>
@@ -642,7 +799,7 @@ export default function GarmentDesigner({ garmentType }: Props) {
                       : "bg-dark text-white hover:bg-dark/80"
                 }`}
               >
-                {added ? "Added to Cart!" : "Add to Cart"}
+                {added ? "Added to Cart!" : `Add to Cart${quantity > 1 ? ` (${quantity})` : ""}`}
               </button>
               {!canAdd && (
                 <p className="text-xs text-muted text-center">
